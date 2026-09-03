@@ -1,0 +1,20 @@
+{
+  "1234567890": {
+    "holder_name": "Ramesh Kumar",
+    "holder_name_kn": "ರಾಮೇಶ್ ಕುಮಾರ್",
+    "balance_inr": 45230.50,
+    "account_type": "Savings"
+  },
+  "9876543210": {
+    "holder_name": "Anita Rao",
+    "holder_name_kn": "ಅನಿತಾ ರಾವ್",
+    "balance_inr": 12500.00,
+    "account_type": "Savings"
+  },
+  "1111222233": {
+    "holder_name": "Suresh Gowda",
+    "holder_name_kn": "ಸುರೇಶ್ ಗೌಡ",
+    "balance_inr": 89340.75,
+    "account_type": "Current"
+  }
+}

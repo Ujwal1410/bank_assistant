@@ -1,0 +1,274 @@
+/* ── Agent / customer screen (responsive polish) ─────────────────────────── */
+
+.lobby-v2 {
+  position: relative;
+}
+
+.lobby-ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.lobby-ambient-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0.45;
+  animation: lobby-orb-float 18s ease-in-out infinite alternate;
+}
+
+.lobby-ambient-orb--1 {
+  width: min(55vw, 320px);
+  height: min(55vw, 320px);
+  top: -8%;
+  right: -5%;
+  background: rgba(240, 193, 74, 0.35);
+}
+
+.lobby-ambient-orb--2 {
+  width: min(45vw, 260px);
+  height: min(45vw, 260px);
+  bottom: 5%;
+  left: -8%;
+  background: rgba(56, 130, 190, 0.4);
+  animation-delay: -6s;
+}
+
+@keyframes lobby-orb-float {
+  from {
+    transform: translate(0, 0) scale(1);
+  }
+  to {
+    transform: translate(3%, 5%) scale(1.08);
+  }
+}
+
+.lobby-pulse-ring {
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  border: 2px solid rgba(240, 193, 74, 0.45);
+  animation: lobby-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+.lobby-waiting-bot-wrap,
+.lobby-hero-bot {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.lobby-waiting-card {
+  width: min(100%, 28rem);
+  padding: 1.35rem 1.5rem;
+  border-radius: 20px;
+  text-align: center;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.05));
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 50px rgba(4, 16, 31, 0.35);
+  animation: lobby-panel-in 0.55s ease-out 0.1s both;
+}
+
+.lobby-waiting-card h1 {
+  margin: 0.65rem 0 0.35rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 4vw, 1.85rem);
+  font-weight: 800;
+  color: #f7fbff;
+}
+
+.lobby-waiting-kn {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: rgba(232, 242, 255, 0.92);
+}
+
+.lobby-waiting-en {
+  margin: 0.45rem 0 0;
+  font-size: 0.88rem;
+  color: rgba(186, 206, 226, 0.78);
+}
+
+.lobby-v2 .lobby-top {
+  padding: 0.15rem 0;
+  backdrop-filter: blur(8px);
+}
+
+.lobby-v2 .lobby-brand {
+  font-family: var(--font-kn);
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.lobby-v2 .lobby-cta {
+  min-width: 11rem;
+  padding: 0.85rem 1.5rem;
+  font-size: 1rem;
+  animation: lobby-cta-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes lobby-cta-glow {
+  0%,
+  100% {
+    box-shadow: 0 10px 24px rgba(212, 160, 24, 0.32);
+  }
+  50% {
+    box-shadow: 0 12px 32px rgba(240, 193, 74, 0.48);
+  }
+}
+
+.lobby-v2 .lobby-presence {
+  border-radius: 20px;
+  animation: lobby-panel-in 0.5s ease-out 0.15s both;
+}
+
+.lobby-v2 .lobby-conversation {
+  border-radius: 20px;
+  animation: lobby-panel-in 0.45s ease-out;
+}
+
+.lobby-v2 .live-subtitle {
+  font-size: clamp(1rem, 2.8vw, 1.15rem);
+  padding: 0.65rem 1rem;
+  border-radius: 14px;
+  background: rgba(26, 74, 122, 0.06);
+  border: 1px solid rgba(26, 74, 122, 0.1);
+}
+
+/* Tablet */
+@media (max-width: 900px) {
+  .lobby-v2.lobby-fit {
+    padding: 0.65rem 0.85rem 0.75rem;
+  }
+
+  .lobby-body-idle,
+  .lobby-body-greeting {
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 0.55rem;
+  }
+
+  .lobby-bot-hero.agent-mascot,
+  .agent-mascot.lobby-bot-hero {
+    width: min(52vw, 190px);
+  }
+
+  .lobby-presence {
+    grid-template-columns: 1fr;
+    text-align: center;
+    justify-items: center;
+    padding: 0.85rem;
+  }
+
+  .lobby-camera-presence {
+    width: min(100%, 220px);
+    height: 150px;
+    margin: 0 auto;
+  }
+
+  .lobby-presence-meta {
+    justify-items: center;
+    text-align: center;
+  }
+
+  .lobby-invite h1 {
+    font-size: clamp(1.45rem, 5vw, 2rem);
+  }
+}
+
+/* Phone */
+@media (max-width: 600px) {
+  .lobby-v2 .lobby-top {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .lobby-top-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .lobby-v2 .lobby-chip {
+    font-size: 0.68rem;
+  }
+
+  .lobby-stage {
+    padding: 0.15rem 0.25rem;
+    gap: 0.45rem;
+  }
+
+  .lobby-invite-kn {
+    font-size: 0.92rem;
+  }
+
+  .lobby-invite-en {
+    font-size: 0.8rem;
+  }
+
+  .lobby-v2 .lobby-cta {
+    width: 100%;
+    max-width: 16rem;
+  }
+
+  .lobby-body-conversation .lobby-camera-mini {
+    width: 88px;
+    height: 66px;
+    top: 0.35rem;
+    right: 0.35rem;
+  }
+
+  .lobby-v2 .lobby-conversation {
+    padding: 0.55rem 0.6rem 0.7rem;
+    border-radius: 16px;
+  }
+
+  .lobby-convo-hero {
+    display: none;
+  }
+
+  .lobby-waiting-stage {
+    padding: 0 0.5rem;
+  }
+
+  .lobby-waiting-card {
+    padding: 1.1rem 1rem;
+  }
+
+  .live-digit-row {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .live-digit-slot {
+    width: 1.65rem;
+    height: 2rem;
+    font-size: 0.95rem;
+  }
+
+  .live-filled-chips {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .live-chip {
+    font-size: 0.72rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-ambient-orb,
+  .lobby-pulse-ring,
+  .lobby-v2 .lobby-cta {
+    animation: none;
+  }
+}
+
+.handsfree-footer {
+  display: none;
+}

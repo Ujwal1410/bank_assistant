@@ -1,0 +1,96 @@
+"""Kannada-script and transliteration keywords for intent hints before NLU."""
+
+from __future__ import annotations
+
+import re
+
+from backend.nlu.intents import INTENTS
+
+# High-signal Kannada / STT-transliteration terms per intent
+KANNADA_INTENT_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "check_balance": (
+        "ಬ್ಯಾಲೆನ್ಸ್",
+        "baaki",
+        "bakki",
+        "baaki tilisi",
+        "balance",
+    ),
+    "withdraw_money": (
+        "ಹಿಂಪಡೆ",
+        "hinpade",
+        "withdraw",
+        "cash out",
+        "ಹಣ ತೆಗೆ",
+    ),
+    "deposit_money": (
+        "ಠೇವಣಿ",
+        "thevani",
+        "tevani",
+        "deposit",
+        "cash deposit",
+    ),
+    "open_account": (
+        "ಖಾತೆ",
+        "khate",
+        "khata",
+        "open account",
+        "new account",
+        "ಖಾತೆ ತೆಗೆ",
+    ),
+    "apply_loan": (
+        "ಸಾಲ",
+        "sala",
+        "loan",
+        "salakke",
+        "home loan",
+        "personal loan",
+    ),
+    "interest_rate_query": (
+        "ಬಡ್ಡಿ",
+        "baddi",
+        "interest rate",
+        "interest",
+        "fd rate",
+        "fixed deposit rate",
+    ),
+    "account_info_query": (
+        "ಮಾಹಿತಿ",
+        "mahiti",
+        "account info",
+        "cheque book",
+        "atm card",
+        "pin change",
+        "mobile update",
+    ),
+}
+
+
+def _norm(text: str) -> str:
+    return re.sub(r"\s+", " ", (text or "").lower()).strip()
+
+
+def match_kannada_intent(kannada: str, english: str = "") -> tuple[str, float] | None:
+    """
+    Match intent from Kannada text (and optional English) using keyword overlap.
+    Returns (intent, confidence) or None.
+    """
+    combined = _norm(f"{kannada} {english}")
+    if not combined:
+        return None
+
+    best_intent: str | None = None
+    best_len = 0
+    for intent, keywords in KANNADA_INTENT_KEYWORDS.items():
+        if intent not in INTENTS:
+            continue
+        for kw in keywords:
+            kw_n = _norm(kw)
+            if kw_n and kw_n in combined and len(kw_n) > best_len:
+                best_intent = intent
+                best_len = len(kw_n)
+
+    if not best_intent:
+        return None
+    # Keyword hits are confident enough to bias routing
+    conf = min(0.92, 0.55 + best_len * 0.04)
+    return best_intent, round(conf, 4)
