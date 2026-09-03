@@ -342,5 +342,5 @@ Laptop-only without certs: `$env:VITE_DEV_HTTP='1'; .\scripts\dev-all.ps1` then 
 
 ## License
 
-Academic project — AI/ML Engineering, 2024-25.
+Academic project — AI/ML Engineering
 Models are subject to their respective licences (see each module's README).
