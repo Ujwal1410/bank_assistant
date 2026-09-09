@@ -37,7 +37,12 @@ _OFFLINE_ENV = {
 
 
 def _cache_path(slot: str, variant: int) -> str:
-    return os.path.join(GREET_DIR, f"{slot}_{variant}.wav")
+    speaker = (
+        "Anu"
+        if os.environ.get("BANK_TTS_SPEAKER", "Suresh").strip().lower() == "anu"
+        else "Suresh"
+    )
+    return os.path.join(GREET_DIR, f"{slot}_{variant}_{speaker.lower()}.wav")
 
 
 def _is_cached(slot: str, variant: int) -> bool:
@@ -120,6 +125,12 @@ def main() -> int:
         action="store_true",
         help="Regenerate even if cache files already exist",
     )
+    parser.add_argument(
+        "--speaker",
+        choices=("Suresh", "Anu"),
+        default="Suresh",
+        help="Voice to warm (default: Suresh)",
+    )
     args = parser.parse_args()
 
     # Load .env so BANK_TTS_REMOTE_URL is visible when run from shell
@@ -129,6 +140,7 @@ def main() -> int:
         load_dotenv(os.path.join(ROOT, ".env"), override=False)
     except Exception:
         pass
+    os.environ["BANK_TTS_SPEAKER"] = args.speaker
 
     os.makedirs(GREET_DIR, exist_ok=True)
     total = 0
@@ -160,7 +172,7 @@ def main() -> int:
                 return False
             print(f"  Remote TTS {slot}_{variant}…", flush=True)
             try:
-                b64 = kannada_to_b64(line)
+                b64 = kannada_to_b64(line, speaker=args.speaker)
             except Exception as exc:
                 print(f"  FAIL {slot}_{variant}: {exc}", flush=True)
                 return False
@@ -200,10 +212,10 @@ def main() -> int:
         warm_env = {
             "BANK_GREET_TTS_ENGINE": "parler",
             "BANK_TTS_ENGINE": "parler",
-            "BANK_TTS_SPEAKER": "Suresh",
+            "BANK_TTS_SPEAKER": args.speaker,
             "BANK_GREET_ALLOW_ONLINE": "1",
         }
-        label = "Indic Parler-TTS (Suresh)"
+        label = f"Indic Parler-TTS ({args.speaker})"
         timeout = 600
     else:
         warm_env = dict(_OFFLINE_ENV)

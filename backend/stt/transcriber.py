@@ -16,6 +16,7 @@ Usage
 import os
 import time
 import warnings
+from typing import Literal
 
 import numpy as np
 import soundfile as sf
@@ -35,6 +36,9 @@ _BANKING_HOTWORDS = (
     "ಖಾತೆ ಸಾಲ ಠೇವಣಿ ಬ್ಯಾಂಕ್ ಬಾಕಿ ಹಿಂಪಡೆಯುವಿಕೆ ವರ್ಗಾಯಿಸು "
     "ಬಡ್ಡಿ ಎಟಿಎಂ ಕಾರ್ಡ್ ಮೊಬೈಲ್ ಪಿನ್ ಚೆಕ್ ಶಾಖೆ "
     "ಹೆಸರು ಪೂರ್ಣ ಹೆಸರು ನನ್ನ ಹೆಸರು"
+)
+_BANKING_INITIAL_PROMPT = (
+    "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ. ಖಾತೆ, ಸಾಲ, ಠೇವಣಿ, ಹಿಂಪಡೆಯುವಿಕೆ, ಬ್ಯಾಂಕ್."
 )
 
 
@@ -136,16 +140,22 @@ class KannadaTranscriber:
                 f"CUDA STT initialization failed ({exc}); falling back to CPU.",
                 stacklevel=2,
             )
+            self._device = "cpu"
+            self._compute_type = "int8"
             return WhisperModel(
                 self._model_path,
                 device="cpu",
-                compute_type=self._compute_type,
+                compute_type="int8",
             )
 
     def transcribe(
         self,
         audio_path: str,
         beam_size: int = 1,
+        *,
+        initial_prompt: str | None = None,
+        hotwords: str | None = None,
+        language: Literal["kn", "en"] = "kn",
     ) -> str:
         """
         Transcribe a Kannada ``.wav`` file and return the Kannada text.
@@ -188,18 +198,27 @@ class KannadaTranscriber:
         # --- 3. Run model inference ---
         t_start = time.perf_counter()
 
+        effective_hotwords = " ".join(
+            part
+            for part in (
+                _BANKING_HOTWORDS if language == "kn" else "",
+                hotwords or "",
+            )
+            if part
+        )
         segments, _info = self._model.transcribe(
             audio_path,
-            language="kn",       # Force Kannada; skip language-detection (saves ~1–2 s)
+            language=language,
             task="transcribe",   # Keep Kannada output (not translation to English)
             beam_size=beam_size,
             vad_filter=True,     # Built-in VAD removes silence padding automatically
             word_timestamps=False,
             # Bias decoder toward Kannada script (not Romanized Latin) on short clips.
             # Banking vocabulary hotwords reduce domain-specific WER by ~5-10%.
-            initial_prompt="ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ. ಖಾತೆ, ಸಾಲ, ಠೇವಣಿ, ಹಿಂಪಡೆಯುವಿಕೆ, ಬ್ಯಾಂಕ್.",
+            initial_prompt=initial_prompt
+            or (_BANKING_INITIAL_PROMPT if language == "kn" else None),
             condition_on_previous_text=False,
-            hotwords=_BANKING_HOTWORDS,
+            hotwords=effective_hotwords,
         )
 
         # Segments are a lazy generator — iterate to materialise them

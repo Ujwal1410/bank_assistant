@@ -64,7 +64,7 @@ from huggingface_hub import model_info
 for mid in (
     "ai4bharat/indictrans2-indic-en-dist-200M",
     "ai4bharat/indictrans2-en-indic-dist-200M",
-    "ARTPARK-IISc/whisper-medium-vaani-kannada",
+    "vasista22/whisper-kannada-medium",
 ):
     model_info(mid)
 print("HF_ACCESS_OK")
@@ -395,12 +395,12 @@ if (-not $SkipModels) {
         Write-Host "  Downloading ML models (20–40 min first time, stay online)..." -ForegroundColor White
 
         # STT
-        $sttBin = Join-Path $ProjectRoot "models\whisper-medium-vaani-ct2\model.bin"
+        $sttBin = Join-Path $ProjectRoot "models\whisper-kannada-medium-ct2\model.bin"
         if (Test-Path $sttBin) {
             Ok "STT model already present"
         } else {
             Write-Host "  [1/4] STT Kannada model (~1.5 GB)..."
-            VPy backend\stt\convert_models.py --model specialized
+            VPy backend\stt\convert_models.py --model vasista-medium
             if (-not (Test-Path $sttBin)) { Fail "STT conversion failed" }
             Ok "STT model ready"
         }

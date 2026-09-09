@@ -107,7 +107,7 @@ export function ResultPanel({
             className="primary-btn"
             onClick={() => onFillForm?.(result.form_id!)}
           >
-            Fill form by voice · ಅರ್ಜಿ ಭರ್ತಿ ಮಾಡಿ
+            ಧ್ವನಿಯ ಮೂಲಕ ಅರ್ಜಿಯನ್ನು ಭರ್ತಿ ಮಾಡಿ · Fill form by voice
           </button>
         </div>
       )}

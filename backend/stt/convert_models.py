@@ -9,7 +9,7 @@ this step).
 
 Usage
 -----
-    # Convert both models (recommended first-time setup)
+    # Convert every registered model
     python backend/stt/convert_models.py --model all
 
     # Convert only the baseline (openai/whisper-medium)
@@ -17,6 +17,9 @@ Usage
 
     # Convert only the Kannada-specialized model
     python backend/stt/convert_models.py --model specialized
+
+    # Convert the Vasista Kannada Medium production model
+    python backend/stt/convert_models.py --model vasista-medium
 
 Requirements
 ------------
@@ -45,6 +48,27 @@ import sys
 
 from ctranslate2.converters import TransformersConverter
 
+
+class _CompatibleTransformersConverter(TransformersConverter):
+    """Bridge CTranslate2 4.8's loader argument to Transformers < 4.56."""
+
+    def load_model(self, model_class, model_name_or_path, **kwargs):
+        # CTranslate2 4.8 uses the newer ``dtype`` argument. Transformers
+        # 4.53 still expects ``torch_dtype`` and otherwise forwards ``dtype``
+        # into Whisper's constructor, where it raises TypeError.
+        if "dtype" in kwargs:
+            import transformers
+
+            version = tuple(
+                int(part)
+                for part in transformers.__version__.split(".")[:2]
+                if part.isdigit()
+            )
+            if version < (4, 56):
+                kwargs["torch_dtype"] = kwargs.pop("dtype")
+        return super().load_model(model_class, model_name_or_path, **kwargs)
+
+
 # ---------------------------------------------------------------------------
 # Model registry
 # Add new models here — nothing else needs to change.
@@ -62,7 +86,12 @@ MODELS: dict[str, dict[str, str]] = {
     "specialized": {
         "hf_id": "ARTPARK-IISc/whisper-medium-vaani-kannada",
         "output_dir": os.path.join(_PROJECT_ROOT, "models", "whisper-medium-vaani-ct2"),
-        "description": "Whisper fine-tuned on VAANI Kannada dataset — production model",
+        "description": "Whisper fine-tuned on VAANI Kannada dataset — rollback model",
+    },
+    "vasista-medium": {
+        "hf_id": "vasista22/whisper-kannada-medium",
+        "output_dir": os.path.join(_PROJECT_ROOT, "models", "whisper-kannada-medium-ct2"),
+        "description": "Vasista Whisper Medium fine-tuned for Kannada — production default",
     },
 }
 
@@ -114,7 +143,7 @@ def convert_model(model_key: str) -> None:
     Parameters
     ----------
     model_key:
-        One of the keys in :data:`MODELS` (``"baseline"`` or ``"specialized"``).
+        One of the keys in :data:`MODELS`.
 
     Raises
     ------
@@ -140,7 +169,7 @@ def convert_model(model_key: str) -> None:
     print("  (This may take several minutes on first run — model is ~1.5 GB)\n")
 
     try:
-        converter = TransformersConverter(
+        converter = _CompatibleTransformersConverter(
             hf_id,
             low_cpu_mem_usage=True,   # Keeps peak RAM lower during conversion
         )

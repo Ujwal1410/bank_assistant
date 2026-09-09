@@ -24,7 +24,7 @@ function adminRootPlugin(): Plugin {
         if (ctx.path?.endsWith("admin.html") || ctx.filename?.endsWith("admin.html")) {
           return html.replace(
             "<title>Admin · Kannada Voice Banking</title>",
-            "<title>Admin · ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</title>",
+            "<title>ನಿರ್ವಹಣೆ · ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</title>",
           );
         }
         return html;

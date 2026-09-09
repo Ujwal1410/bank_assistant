@@ -8,12 +8,15 @@ so synthesis runs in a long-lived subprocess started from .venv-parler.
 from __future__ import annotations
 
 import base64
+from collections import deque
 import io
 import json
 import os
+import queue
 import subprocess
 import sys
 import threading
+import time
 from typing import Any
 
 import numpy as np
@@ -28,6 +31,46 @@ _proc: subprocess.Popen[str] | None = None
 _ready = False
 _warmed = False
 _warm_error: str | None = None
+_worker_info: dict[str, Any] = {}
+_last_metrics: dict[str, Any] = {}
+_stderr_tail: deque[str] = deque(maxlen=60)
+
+
+def _terminate_process(proc: subprocess.Popen[str] | None) -> None:
+    if proc is None:
+        return
+    try:
+        if proc.poll() is None:
+            proc.kill()
+        proc.wait(timeout=10)
+    except Exception:
+        pass
+    for stream in (proc.stdin, proc.stdout, proc.stderr):
+        try:
+            if stream is not None:
+                stream.close()
+        except Exception:
+            pass
+
+
+def _readline_with_timeout(stream, timeout_s: float) -> str:
+    """Read a worker response without allowing a dead GPU process to hang forever."""
+    result: queue.Queue[str | BaseException] = queue.Queue(maxsize=1)
+
+    def _read() -> None:
+        try:
+            result.put(stream.readline())
+        except BaseException as exc:
+            result.put(exc)
+
+    threading.Thread(target=_read, daemon=True, name="parler-worker-read").start()
+    try:
+        value = result.get(timeout=max(1.0, timeout_s))
+    except queue.Empty as exc:
+        raise TimeoutError(f"Parler worker timed out after {timeout_s:.0f}s") from exc
+    if isinstance(value, BaseException):
+        raise value
+    return value
 
 
 def _parler_python() -> str | None:
@@ -118,6 +161,15 @@ def parler_warm_error() -> str | None:
     return _warm_error
 
 
+def parler_runtime_info() -> dict[str, Any]:
+    """Return non-secret worker details and the latest synthesis timings."""
+    return {
+        **_worker_info,
+        "ready": parler_ready(),
+        "last_metrics": dict(_last_metrics),
+    }
+
+
 def ensure_parler_ready(*, run_synth_ping: bool = True) -> bool:
     """
     Block until the Parler worker subprocess has loaded the model into GPU.
@@ -142,7 +194,7 @@ def ensure_parler_ready(*, run_synth_ping: bool = True) -> bool:
                 resp = _request({"cmd": "synth", "text": "ಸರಿ", "speaker": sp}, _hold_lock=True)
                 if not resp.get("ok"):
                     raise RuntimeError(resp.get("error") or "warmup synth failed")
-            _warmed = True
+            _warmed = run_synth_ping
             _warm_error = None
             return True
         except Exception as exc:
@@ -152,7 +204,7 @@ def ensure_parler_ready(*, run_synth_ping: bool = True) -> bool:
 
 
 def _start_worker_locked() -> None:
-    global _proc, _ready, _warmed
+    global _proc, _ready, _warmed, _worker_info
     if _proc is not None and _proc.poll() is None and _ready:
         return
 
@@ -170,7 +222,7 @@ def _start_worker_locked() -> None:
     for key in ("HF_HUB_OFFLINE", "HF_DATASETS_OFFLINE", "TRANSFORMERS_OFFLINE"):
         env.pop(key, None)
     env.setdefault("TRANSFORMERS_OFFLINE", "0")
-    _proc = subprocess.Popen(
+    proc = subprocess.Popen(
         [py, WORKER_SCRIPT],
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -180,66 +232,122 @@ def _start_worker_locked() -> None:
         env=env,
         bufsize=1,
     )
-    assert _proc.stdout is not None
+    _proc = proc
+    _stderr_tail.clear()
+    assert proc.stdout is not None
 
-    def _drain_stderr() -> None:
-        assert _proc is not None and _proc.stderr is not None
-        for line in _proc.stderr:
+    def _drain_stderr(worker: subprocess.Popen[str] = proc) -> None:
+        assert worker.stderr is not None
+        for line in worker.stderr:
             line = line.rstrip()
             if line:
+                _stderr_tail.append(line)
                 print(line, file=sys.stderr, flush=True)
 
     threading.Thread(target=_drain_stderr, daemon=True, name="parler-worker-stderr").start()
 
     # First stdout line should be ready handshake (after model load in worker).
-    line = _proc.stdout.readline()
-    if not line:
-        err = _proc.stderr.read() if _proc.stderr else ""
+    start_timeout = float(os.environ.get("BANK_PARLER_START_TIMEOUT", "180"))
+    try:
+        line = _readline_with_timeout(proc.stdout, start_timeout)
+    except TimeoutError:
         _proc = None
         _ready = False
         _warmed = False
-        raise RuntimeError(f"Parler worker failed to start: {err[:500]}")
+        _terminate_process(proc)
+        raise
+    if not line:
+        _proc = None
+        _ready = False
+        _warmed = False
+        _terminate_process(proc)
+        raise RuntimeError(
+            f"Parler worker failed to start: {' | '.join(_stderr_tail)[-500:]}"
+        )
     try:
         payload = json.loads(line)
     except json.JSONDecodeError as exc:
+        _proc = None
         _ready = False
+        _warmed = False
+        _terminate_process(proc)
         raise RuntimeError(f"Parler worker bad handshake: {line[:200]}") from exc
     if not payload.get("ok"):
+        _proc = None
         _ready = False
+        _warmed = False
+        _terminate_process(proc)
         raise RuntimeError(payload.get("error") or "Parler worker not ready")
+    _worker_info = {
+        key: payload.get(key)
+        for key in (
+            "device",
+            "device_name",
+            "dtype",
+            "model",
+            "cuda_version",
+            "free_vram_mb",
+            "total_vram_mb",
+        )
+        if payload.get(key) is not None
+    }
     _ready = True
 
 
 def _request(payload: dict[str, Any], timeout_s: float = 300.0, *, _hold_lock: bool = False) -> dict[str, Any]:
-    global _proc, _ready
+    global _proc, _ready, _last_metrics
+    queued_at = time.perf_counter()
 
     def _do_request() -> dict[str, Any]:
-        global _proc, _ready
+        global _proc, _ready, _warmed, _last_metrics
+        queue_wait_s = time.perf_counter() - queued_at
         _start_worker_locked()
         assert _proc is not None and _proc.stdin and _proc.stdout
         try:
             _proc.stdin.write(json.dumps(payload) + "\n")
             _proc.stdin.flush()
         except BrokenPipeError:
+            broken_proc = _proc
             _proc = None
             _ready = False
+            _terminate_process(broken_proc)
             _start_worker_locked()
             assert _proc is not None and _proc.stdin and _proc.stdout
             _proc.stdin.write(json.dumps(payload) + "\n")
             _proc.stdin.flush()
 
-        line = _proc.stdout.readline()
-        if not line:
-            err = ""
-            if _proc.stderr:
-                try:
-                    err = _proc.stderr.read()[:800]
-                except Exception:
-                    pass
+        try:
+            line = _readline_with_timeout(_proc.stdout, timeout_s)
+        except TimeoutError:
+            timed_out_proc = _proc
             _proc = None
             _ready = False
-            raise RuntimeError(f"Parler worker died: {err}")
-        return json.loads(line)
+            _warmed = False
+            _terminate_process(timed_out_proc)
+            raise
+        if not line:
+            dead_proc = _proc
+            _proc = None
+            _ready = False
+            _terminate_process(dead_proc)
+            raise RuntimeError(
+                f"Parler worker died: {' | '.join(_stderr_tail)[-800:]}"
+            )
+        try:
+            response = json.loads(line)
+        except json.JSONDecodeError as exc:
+            bad_proc = _proc
+            _proc = None
+            _ready = False
+            _warmed = False
+            _terminate_process(bad_proc)
+            raise RuntimeError(f"Parler worker returned bad JSON: {line[:200]}") from exc
+        metrics = response.get("metrics")
+        if isinstance(metrics, dict):
+            metrics["queue_wait_s"] = round(queue_wait_s, 3)
+            response["metrics"] = metrics
+            _last_metrics = dict(metrics)
+        return response
 
     if _hold_lock:
         return _do_request()
@@ -248,23 +356,24 @@ def _request(payload: dict[str, Any], timeout_s: float = 300.0, *, _hold_lock: b
 
 
 def stop_worker() -> None:
-    global _proc, _ready, _warmed
+    global _proc, _ready, _warmed, _worker_info, _last_metrics
     with _lock:
         if _proc is None:
             return
+        proc = _proc
         try:
-            if _proc.stdin and _proc.poll() is None:
-                _proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
-                _proc.stdin.flush()
-                _proc.wait(timeout=10)
+            if proc.stdin and proc.poll() is None:
+                proc.stdin.write(json.dumps({"cmd": "quit"}) + "\n")
+                proc.stdin.flush()
+                proc.wait(timeout=10)
         except Exception:
-            try:
-                _proc.kill()
-            except Exception:
-                pass
+            pass
+        _terminate_process(proc)
         _proc = None
         _ready = False
         _warmed = False
+        _worker_info = {}
+        _last_metrics = {}
 
 
 def synthesise_kannada_parler(

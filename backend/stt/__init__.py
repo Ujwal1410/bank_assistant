@@ -7,11 +7,11 @@ Quick-start
 -----------
     from backend.stt import transcribe
 
-    # Uses the Kannada-specialized model by default
+    # Uses BANK_STT_MODEL (vasista-medium by default)
     text = transcribe("data/stt_test_audio/clip_001.wav")
 
-    # Use the generic baseline for comparison
-    text = transcribe("data/stt_test_audio/clip_001.wav", model="baseline")
+    # Explicit rollback to the previous VAANI model
+    text = transcribe("data/stt_test_audio/clip_001.wav", model="specialized")
 
     # Use beam_size=5 for accuracy-critical paths (slower on CPU)
     text = transcribe("path/to/clip.wav", beam_size=5)
@@ -24,12 +24,13 @@ already-loaded instance, avoiding the 2–5 second reload cost.
 from __future__ import annotations
 
 import os
+import warnings
 from typing import Literal
 
 from backend.stt.exceptions import STTInputError
 from backend.stt.transcriber import KannadaTranscriber
 
-__all__ = ["transcribe", "unload_model", "STTInputError"]
+__all__ = ["transcribe", "warm_model", "unload_model", "STTInputError"]
 
 # ---------------------------------------------------------------------------
 # Model path configuration
@@ -43,7 +44,10 @@ _PROJECT_ROOT = os.path.abspath(
 MODEL_PATHS: dict[str, str] = {
     "baseline": os.path.join(_PROJECT_ROOT, "models", "whisper-medium-ct2"),
     "specialized": os.path.join(_PROJECT_ROOT, "models", "whisper-medium-vaani-ct2"),
+    "vasista-medium": os.path.join(_PROJECT_ROOT, "models", "whisper-kannada-medium-ct2"),
 }
+ModelName = Literal["baseline", "specialized", "vasista-medium"]
+DEFAULT_MODEL: ModelName = "vasista-medium"
 
 # ---------------------------------------------------------------------------
 # Singleton cache — keyed by model name
@@ -51,10 +55,51 @@ MODEL_PATHS: dict[str, str] = {
 _model_cache: dict[str, KannadaTranscriber] = {}
 
 
+def active_model_name() -> ModelName:
+    """Resolve the environment-selected production model."""
+    selected = os.environ.get("BANK_STT_MODEL", DEFAULT_MODEL).strip() or DEFAULT_MODEL
+    if selected not in MODEL_PATHS:
+        valid = ", ".join(f'"{key}"' for key in MODEL_PATHS)
+        raise ValueError(
+            f"Unknown BANK_STT_MODEL '{selected}'. Valid options are: {valid}."
+        )
+    return selected  # type: ignore[return-value]
+
+
+def _resolve_model(model: ModelName | None) -> ModelName:
+    selected = model or active_model_name()
+    path = MODEL_PATHS[selected]
+    if (
+        model is None
+        and selected == DEFAULT_MODEL
+        and not os.path.isdir(path)
+        and os.path.isdir(MODEL_PATHS["specialized"])
+    ):
+        warnings.warn(
+            "Default Vasista STT model is not converted yet; using the existing "
+            "specialized model. Run convert_models.py --model vasista-medium.",
+            stacklevel=3,
+        )
+        return "specialized"
+    return selected
+
+
+def warm_model(model: ModelName | None = None) -> ModelName:
+    """Load and cache the selected STT model without transcribing audio."""
+    selected = _resolve_model(model)
+    if selected not in _model_cache:
+        _model_cache[selected] = KannadaTranscriber(MODEL_PATHS[selected])
+    return selected
+
+
 def transcribe(
     audio_path: str,
-    model: Literal["baseline", "specialized"] = "specialized",
+    model: ModelName | None = None,
     beam_size: int = 1,
+    *,
+    initial_prompt: str | None = None,
+    hotwords: str | None = None,
+    language: Literal["kn", "en"] = "kn",
 ) -> str:
     """
     Transcribe a Kannada ``.wav`` file and return the Kannada text.
@@ -68,10 +113,11 @@ def transcribe(
     audio_path:
         Path to the ``.wav`` audio file to transcribe.
     model:
-        Which model to use:
+        Which model to use. When omitted, ``BANK_STT_MODEL`` selects it:
 
-        - ``"specialized"`` (default) — ``ARTPARK-IISc/whisper-medium-vaani-kannada``
-          fine-tuned on the VAANI Kannada dataset.  Use this for production.
+        - ``"vasista-medium"`` (default) — ``vasista22/whisper-kannada-medium``.
+        - ``"specialized"`` — ``ARTPARK-IISc/whisper-medium-vaani-kannada``
+          retained for rollback.
         - ``"baseline"`` — ``openai/whisper-medium``, the generic multilingual
           model.  Use this for benchmarking comparison only.
     beam_size:
@@ -91,22 +137,25 @@ def transcribe(
         If the audio file is missing, unsupported, or corrupted.
     FileNotFoundError
         If the model directory has not been created yet.
-        Run ``python backend/stt/convert_models.py --model all`` first.
+        Run ``python backend/stt/convert_models.py --model vasista-medium`` first.
     """
-    if model not in MODEL_PATHS:
-        valid = ", ".join(f'"{k}"' for k in MODEL_PATHS)
-        raise ValueError(
-            f"Unknown model '{model}'. Valid options are: {valid}."
-        )
+    selected = warm_model(model)
 
-    # Lazy-load and cache the transcriber
-    if model not in _model_cache:
-        _model_cache[model] = KannadaTranscriber(MODEL_PATHS[model])
+    field_hints: dict[str, str] = {}
+    if initial_prompt:
+        field_hints["initial_prompt"] = initial_prompt
+    if hotwords:
+        field_hints["hotwords"] = hotwords
+    if language != "kn":
+        field_hints["language"] = language
+    return _model_cache[selected].transcribe(
+        audio_path,
+        beam_size=beam_size,
+        **field_hints,
+    )
 
-    return _model_cache[model].transcribe(audio_path, beam_size=beam_size)
 
-
-def unload_model(model: str = "specialized") -> None:
+def unload_model(model: ModelName | Literal["all"] | None = None) -> None:
     """
     Release the cached STT model from memory.
 
@@ -117,13 +166,17 @@ def unload_model(model: str = "specialized") -> None:
     Parameters
     ----------
     model:
-        ``"specialized"``, ``"baseline"``, or ``"all"`` to clear all cached models.
+        A registered model, ``None`` for the active model, or ``"all"``.
     """
     import gc
     import torch
 
     global _model_cache
-    keys = list(_model_cache.keys()) if model == "all" else [model]
+    keys = (
+        list(_model_cache.keys())
+        if model == "all"
+        else [_resolve_model(model)]
+    )
     for key in keys:
         if key in _model_cache:
             del _model_cache[key]

@@ -25,12 +25,33 @@ class TestSTTHotwords(unittest.TestCase):
         _model_cls.return_value = mock_model
 
         t = KannadaTranscriber("models/whisper-medium-vaani-ct2", device="cpu")
-        out = t.transcribe("fake.wav")
+        out = t.transcribe(
+            "fake.wav",
+            initial_prompt="ದಿನಾಂಕದ ಉತ್ತರ",
+            hotwords="ಹದಿನಾಲ್ಕು ಎರಡು ಸಾವಿರ ಮೂರು",
+        )
         self.assertEqual(out, "ಪರೀಕ್ಷೆ")
 
         _kwargs = mock_model.transcribe.call_args.kwargs
         self.assertIsInstance(_kwargs["hotwords"], str)
         self.assertIn("ಖಾತೆ", _kwargs["hotwords"])
+        self.assertIn("ಹದಿನಾಲ್ಕು", _kwargs["hotwords"])
+        self.assertEqual(_kwargs["initial_prompt"], "ದಿನಾಂಕದ ಉತ್ತರ")
+        self.assertEqual(_kwargs["language"], "kn")
+        self.assertEqual(_kwargs["task"], "transcribe")
+        self.assertTrue(_kwargs["vad_filter"])
+        self.assertEqual(_kwargs["beam_size"], 1)
+
+        t.transcribe(
+            "fake.wav",
+            language="en",
+            initial_prompt="A ten digit mobile number.",
+            hotwords="zero one two three four five six seven eight nine",
+        )
+        english_kwargs = mock_model.transcribe.call_args.kwargs
+        self.assertEqual(english_kwargs["language"], "en")
+        self.assertNotIn("ಖಾತೆ", english_kwargs["hotwords"])
+        self.assertIn("nine", english_kwargs["hotwords"])
 
 
 if __name__ == "__main__":

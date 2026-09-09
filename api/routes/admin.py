@@ -51,12 +51,25 @@ def set_voice_settings(
     body: VoiceSettingsBody,
     _admin: dict = Depends(admin_auth.require_admin),
 ) -> dict:
-    from api.app_settings import set_tts_speaker
+    from api.app_settings import get_tts_speaker, set_tts_speaker
+    from backend.pipeline_bridge import set_worker_speaker
 
+    previous = get_tts_speaker()
     try:
         speaker = set_tts_speaker(body.speaker)
+        set_worker_speaker(speaker)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        try:
+            set_tts_speaker(previous)
+            set_worker_speaker(previous)
+        except Exception:
+            pass
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not apply voice to the speech worker: {exc}",
+        ) from exc
     return {"ok": True, "speaker": speaker}
 
 

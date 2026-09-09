@@ -17,6 +17,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import traceback
 
 # Load .env before anything else so BANK_TTS_ENGINE and offline flags are set
@@ -53,11 +54,53 @@ def _reply(payload: dict) -> None:
     _REAL_STDOUT.flush()
 
 
-def _process(wav: str, context: dict | None = None) -> dict:
+def _warm() -> dict:
+    """Load request-path models before the kiosk accepts a conversation."""
+    stages: dict[str, float] = {}
+
+    started = time.perf_counter()
+    from backend.stt import warm_model as warm_stt
+
+    stt_model = warm_stt()
+    stages["stt"] = round(time.perf_counter() - started, 2)
+
+    started = time.perf_counter()
+    from backend.translation import warm_model as warm_translation
+
+    warm_translation("kn_to_en")
+    stages["translation"] = round(time.perf_counter() - started, 2)
+
+    started = time.perf_counter()
+    from backend.nlu import warm_model as warm_nlu
+
+    warm_nlu("finetuned")
+    stages["nlu"] = round(time.perf_counter() - started, 2)
+
+    return {"ok": True, "warmed": True, "model": stt_model, "stage_times": stages}
+
+
+def _set_speaker(name: str) -> dict:
+    """Apply an admin-selected voice inside this long-lived worker process."""
+    from api.app_settings import set_tts_speaker
+
+    speaker = set_tts_speaker(name)
+    return {"ok": True, "speaker": speaker}
+
+
+def _process(
+    wav: str,
+    context: dict | None = None,
+    *,
+    include_audio: bool = True,
+) -> dict:
     import soundfile as sf
     from backend.pipeline import run_pipeline
 
-    result = run_pipeline(wav, context=context)
+    result = run_pipeline(
+        wav,
+        context=context,
+        synthesise_audio=include_audio,
+    )
     audio_b64 = ""
     if result.audio is not None:
         buf = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -152,7 +195,7 @@ def _transcribe(wav: str) -> dict:
     english = ""
     error = None
     try:
-        kannada = transcribe(wav, model="specialized", beam_size=1) or ""
+        kannada = transcribe(wav, beam_size=1) or ""
         if not kannada.strip():
             error = "STT returned empty (silent audio)"
         else:
@@ -184,20 +227,78 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
     english = ""
     value = ""
     error = None
+    validation_error = None
+    stage_times: dict[str, float] = {}
     try:
-        from backend.forms.stt_tuning import NAME_FIELD_IDS, form_fill_beam_size
+        from backend.forms.stt_tuning import (
+            NAME_FIELD_IDS,
+            english_digit_retry_hints,
+            form_fill_beam_size,
+            form_fill_stt_hints,
+            plausible_digit_capture,
+        )
 
         beam = form_fill_beam_size(field_type, field_id)
-        kannada = transcribe(wav, model="specialized", beam_size=beam) or ""
+        prompt, hotwords = form_fill_stt_hints(field_type, field_id)
+        started = time.perf_counter()
+        kannada = transcribe(
+            wav,
+            beam_size=beam,
+            initial_prompt=prompt,
+            hotwords=hotwords,
+        ) or ""
+        stage_times["stt"] = round(time.perf_counter() - started, 2)
         if not kannada.strip():
             error = "STT returned empty (silent audio)"
         else:
-            english = translate_kn_to_en(kannada) or ""
-            if not english.strip():
-                value = kannada.strip()
-                error = "Translation returned empty; using Kannada text"
-            else:
-                value = extract_field_value(english, field_type=field_type, field_id=field_id)
+            normalized_type = (field_type or "").lower()
+            if normalized_type == "digits":
+                from backend.forms.kannada_digits import extract_digits_from_kannada
+
+                primary_digits = extract_digits_from_kannada(kannada)
+                if plausible_digit_capture(primary_digits, field_id):
+                    value = primary_digits
+                else:
+                    retry_prompt, retry_hotwords = english_digit_retry_hints(field_id)
+                    started = time.perf_counter()
+                    retry_text = transcribe(
+                        wav,
+                        beam_size=beam,
+                        initial_prompt=retry_prompt,
+                        hotwords=retry_hotwords,
+                        language="en",
+                    ) or ""
+                    stage_times["stt_numeric_retry"] = round(
+                        time.perf_counter() - started,
+                        2,
+                    )
+                    retry_digits = extract_digits_from_kannada(retry_text)
+                    if plausible_digit_capture(retry_digits, field_id) or len(
+                        retry_digits
+                    ) > len(primary_digits):
+                        value = retry_digits
+                        english = retry_text
+
+            if not value and (
+                normalized_type == "date" or "date" in (field_id or "").lower()
+            ):
+                from backend.forms.date_kn import extract_date_from_kannada
+
+                value = extract_date_from_kannada(kannada)
+
+            if not value:
+                started = time.perf_counter()
+                english = translate_kn_to_en(kannada) or ""
+                stage_times["translation"] = round(time.perf_counter() - started, 2)
+                if not english.strip():
+                    value = kannada.strip()
+                    error = "Translation returned empty; using Kannada text"
+                else:
+                    value = extract_field_value(
+                        english,
+                        field_type=field_type,
+                        field_id=field_id,
+                    )
 
             if not (value or "").strip() and (field_id or "").lower() in NAME_FIELD_IDS:
                 value = extract_field_value(english or kannada, field_type=field_type, field_id=field_id)
@@ -213,11 +314,18 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
                 value = kn_digits
             elif kn_digits and not value:
                 value = kn_digits
+        from backend.forms.validation import validate_captured_value
+
+        validation_error = validate_captured_value(
+            value,
+            field_type=field_type,
+            field_id=field_id,
+        )
         if not keep:
             try:
                 from backend.stt import unload_model as unload_stt
 
-                unload_stt("specialized")
+                unload_stt()
             except Exception:
                 pass
             try:
@@ -234,6 +342,10 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
         "english_text": english,
         "value": value,
         "error": error,
+        "validation_error": validation_error,
+        "stage_times": stage_times,
+        "digit_count": len("".join(ch for ch in value if ch.isdigit())),
+        "numeric_retry_used": "stt_numeric_retry" in stage_times,
     }
 
 
@@ -252,6 +364,10 @@ def main() -> None:
         try:
             if cmd == "ping":
                 _reply({"ok": True})
+            elif cmd == "warm":
+                _reply(_warm())
+            elif cmd == "set_speaker":
+                _reply(_set_speaker(str(msg.get("speaker") or "")))
             elif cmd == "quit":
                 _reply({"ok": True, "bye": True})
                 break
@@ -263,7 +379,13 @@ def main() -> None:
                 ctx = msg.get("context")
                 if ctx is not None and not isinstance(ctx, dict):
                     ctx = None
-                _reply(_process(wav, ctx))
+                _reply(
+                    _process(
+                        wav,
+                        ctx,
+                        include_audio=bool(msg.get("include_audio", True)),
+                    )
+                )
             elif cmd == "transcribe":
                 wav = msg.get("wav") or ""
                 if not wav or not os.path.isfile(wav):

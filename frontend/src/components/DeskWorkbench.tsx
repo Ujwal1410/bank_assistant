@@ -146,7 +146,8 @@ export function DeskWorkbench({
           )}
           {lobbyMode && (
             <p className="lobby-assist-hint">
-              ಕನ್ನಡದಲ್ಲಿ ನಿಮ್ಮ ಪ್ರಶ್ನೆ ಹೇಳಿ. ಅರ್ಜಿಗಾಗಿ <strong>ಅರ್ಜಿ · Form</strong> ಆಯ್ಕೆ ಮಾಡಿ.
+              ನಿಮ್ಮ ಪ್ರಶ್ನೆಯನ್ನು ಕನ್ನಡದಲ್ಲಿ ಕೇಳಿ. ಅರ್ಜಿಯನ್ನು ಭರ್ತಿ ಮಾಡಲು{" "}
+              <strong>ಅರ್ಜಿಗಳು · Forms</strong> ಆಯ್ಕೆ ಮಾಡಿ.
             </p>
           )}
 

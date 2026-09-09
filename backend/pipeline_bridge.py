@@ -154,8 +154,35 @@ def stop_worker() -> None:
         _ready = False
 
 
-def process_wav(wav_path: str, context: dict | None = None) -> dict[str, Any]:
-    payload: dict[str, Any] = {"cmd": "process", "wav": wav_path}
+def warm_pipeline() -> dict[str, Any]:
+    """Start the worker and block until STT, translation, and NLU are loaded."""
+    response = _request({"cmd": "warm"})
+    if not response.get("ok") or not response.get("warmed"):
+        raise RuntimeError(response.get("error") or "Pipeline warm-up failed")
+    return response
+
+
+def set_worker_speaker(speaker: str) -> str:
+    """Synchronize the selected TTS voice with the long-lived worker."""
+    if not worker_enabled():
+        return speaker
+    response = _request({"cmd": "set_speaker", "speaker": speaker})
+    if not response.get("ok"):
+        raise RuntimeError(response.get("error") or "Worker voice update failed")
+    return str(response.get("speaker") or speaker)
+
+
+def process_wav(
+    wav_path: str,
+    context: dict | None = None,
+    *,
+    include_audio: bool = True,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "cmd": "process",
+        "wav": wav_path,
+        "include_audio": include_audio,
+    }
     if context:
         payload["context"] = context
     try:
@@ -211,6 +238,10 @@ def fill_field(wav_path: str, field_type: str = "text", field_id: str = "") -> d
         "english_text": resp.get("english_text") or "",
         "value": resp.get("value") or "",
         "error": resp.get("error"),
+        "validation_error": resp.get("validation_error"),
+        "stage_times": resp.get("stage_times") or {},
+        "digit_count": int(resp.get("digit_count") or 0),
+        "numeric_retry_used": bool(resp.get("numeric_retry_used")),
     }
 
 
@@ -237,11 +268,16 @@ def speak_batch(texts: dict[str, str]) -> dict[str, str]:
     return out
 
 
-def oneshot_process(wav_path: str, context: dict[str, Any] | None = None) -> dict[str, Any]:
+def oneshot_process(
+    wav_path: str,
+    context: dict[str, Any] | None = None,
+    *,
+    include_audio: bool = True,
+) -> dict[str, Any]:
     script = os.path.join(PROJECT_ROOT, "run_pipeline_subprocess.py")
     args = [sys.executable, script, wav_path]
-    if context:
-        args.append(json.dumps(context))
+    args.append(json.dumps(context or {}))
+    args.append("1" if include_audio else "0")
     proc = subprocess.run(
         args,
         capture_output=True,

@@ -25,7 +25,7 @@ from typing import Any
 from backend.nlu.exceptions import NLUInputError
 from backend.nlu.intents import INTENTS
 
-__all__ = ["classify", "classify_top_k", "unload_model", "NLUInputError", "INTENTS"]
+__all__ = ["classify", "classify_top_k", "warm_model", "unload_model", "NLUInputError", "INTENTS"]
 
 def is_empty_input(text: str) -> bool:
     return not text.strip()
@@ -40,6 +40,22 @@ _VALID_MODELS = {"baseline", "finetuned"}
 
 # Singleton cache — keyed by model name
 _classifier_cache: dict[str, Any] = {}
+
+
+def warm_model(model: str = "finetuned") -> str:
+    """Load and cache an NLU classifier without classifying a request."""
+    if model not in _VALID_MODELS:
+        raise ValueError(f"Unknown model {model!r}. Valid options: {sorted(_VALID_MODELS)}.")
+    if model not in _classifier_cache:
+        if model == "baseline":
+            from backend.nlu.keyword_classifier import KeywordClassifier
+
+            _classifier_cache[model] = KeywordClassifier()
+        else:
+            from backend.nlu.distilbert_classifier import DistilBERTClassifier
+
+            _classifier_cache[model] = DistilBERTClassifier(MODEL_DIR)
+    return model
 
 
 def classify(
@@ -90,13 +106,7 @@ def classify(
         return ("", 0.0)
 
     # Lazy-load and cache
-    if model not in _classifier_cache:
-        if model == "baseline":
-            from backend.nlu.keyword_classifier import KeywordClassifier  # noqa
-            _classifier_cache["baseline"] = KeywordClassifier()
-        else:
-            from backend.nlu.distilbert_classifier import DistilBERTClassifier  # noqa
-            _classifier_cache["finetuned"] = DistilBERTClassifier(MODEL_DIR)
+    warm_model(model)
 
     return _classifier_cache[model].classify(text)
 
@@ -114,15 +124,7 @@ def classify_top_k(text: str, k: int = 2, model: str = "finetuned") -> list[tupl
     if is_empty_input(text):
         return []
 
-    if model not in _classifier_cache:
-        if model == "baseline":
-            from backend.nlu.keyword_classifier import KeywordClassifier  # noqa
-
-            _classifier_cache["baseline"] = KeywordClassifier()
-        else:
-            from backend.nlu.distilbert_classifier import DistilBERTClassifier  # noqa
-
-            _classifier_cache["finetuned"] = DistilBERTClassifier(MODEL_DIR)
+    warm_model(model)
 
     clf = _classifier_cache[model]
     if hasattr(clf, "classify_top_k"):

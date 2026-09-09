@@ -89,7 +89,7 @@ export function greetingForNowFallback(date = new Date()): Greeting {
       title_en: "Good morning",
       hours: "05:00–11:59",
       line_kn:
-        "ಶುಭೋದಯ. ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್ ಏಜೆಂಟ್‌ಗೆ ಸುಸ್ವಾಗತ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
+        "ಶುಭೋದಯ. ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್ ಸೇವೆಗೆ ಸುಸ್ವಾಗತ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?",
       line_en: "Good morning. Welcome. How may I help you?",
     },
     afternoon: {

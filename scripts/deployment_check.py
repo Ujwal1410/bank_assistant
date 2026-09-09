@@ -23,10 +23,18 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
 
+_STT_DIRS = {
+    "vasista-medium": "models/whisper-kannada-medium-ct2",
+    "specialized": "models/whisper-medium-vaani-ct2",
+    "baseline": "models/whisper-medium-ct2",
+}
+_STT_MODEL = os.environ.get("BANK_STT_MODEL", "vasista-medium").strip() or "vasista-medium"
+_STT_DIR = _STT_DIRS.get(_STT_MODEL, _STT_DIRS["vasista-medium"])
+
 # ── Required on-disk assets (git may not include large models) ───────────────
 REQUIRED_PATHS: list[tuple[str, str, str]] = [
-    ("STT (Kannada)", "models/whisper-medium-vaani-ct2/model.bin", "Run: py -3.12 backend/stt/convert_models.py --model specialized"),
-    ("STT config", "models/whisper-medium-vaani-ct2/config.json", "Same as above"),
+    ("STT (Kannada)", f"{_STT_DIR}/model.bin", f"Run: py -3.12 backend/stt/convert_models.py --model {_STT_MODEL}"),
+    ("STT config", f"{_STT_DIR}/config.json", "Same as above"),
     ("NLU model", "models/nlu-distilbert/config.json", "Run: py -3.12 backend/nlu/train.py"),
     ("Demo accounts", "data/demo_accounts.json", "Should exist in repo"),
     ("Forms", "data/forms.json", "Should exist in repo"),

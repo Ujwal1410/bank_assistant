@@ -101,9 +101,8 @@ async function playTimeGreeting(
 }
 
 function greetViaLabel(via: GreetVia): string {
-  if (via === "cached") return "ಕನ್ನಡ ಧ್ವನಿ · Suresh (cached)";
-  if (via === "api") return "ಕನ್ನಡ ಧ್ವನಿ · Suresh (Parler)";
-  return "ಕನ್ನಡ ಧ್ವನಿ · Browser voice (fallback)";
+  if (via === "cached" || via === "api") return "ಕನ್ನಡ ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ";
+  return "ಬದಲಿ ಕನ್ನಡ ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ";
 }
 
 /** Pick greeting locally — no network wait. */
@@ -130,6 +129,9 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
   const leaveTimer = useRef<number | null>(null);
   const formModeActive = useRef(false);
   const statusRef = useRef(status);
+  const statusFailures = useRef(0);
+  const hasLoadedStatus = useRef(false);
+  const statusGraceUntil = useRef(Date.now() + 60_000);
   const presenceRef = useRef<"unknown" | "absent" | "present">("unknown");
   statusRef.current = status;
 
@@ -139,6 +141,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
       case "form_confirm":
         return "listening";
       case "thinking":
+      case "preparing":
       case "form_prompt":
         return "thinking";
       case "speaking":
@@ -207,10 +210,16 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
         }
         return { ...s, sessions: prev?.sessions ?? [] };
       });
+      hasLoadedStatus.current = true;
+      statusFailures.current = 0;
       setError(null);
       return s;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Lobby status failed");
+      if (!hasLoadedStatus.current && Date.now() < statusGraceUntil.current) return null;
+      statusFailures.current += 1;
+      if (statusFailures.current >= 3) {
+        setError(err instanceof Error ? err.message : "Lobby status failed");
+      }
       return null;
     }
   }, []);
@@ -241,7 +250,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
   const runGreetingFlow = useCallback(async () => {
     const greet = pickGreetingNow(greetCatalog);
     setActiveGreet(greet);
-    setGreetStatus(`👋 ${greet.title_kn} — speaking…`);
+    setGreetStatus(`👋 ${greet.title_kn} — ಸ್ವಾಗತಿಸುತ್ತಿದ್ದೇನೆ…`);
     await unlockAudio();
     try {
       const via = await playTimeGreeting(greet, apiOnline);
@@ -460,10 +469,10 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
               <span className="lobby-brand-mark kn" aria-hidden>
                 ಕ
               </span>
-              <p className="lobby-brand kn">ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</p>
+              <p className="lobby-brand kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</p>
             </div>
             <div className="spinner" role="status" aria-label="Loading lobby status" />
-            <h1 className="kn">ಲೋಡ್ ಆಗುತ್ತಿದೆ…</h1>
+            <h1 className="kn">ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ…</h1>
             <p className="lobby-waiting-en">Connecting to counter service…</p>
           </div>
         </div>
@@ -488,11 +497,11 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
               <span className="lobby-brand-mark kn" aria-hidden>
                 ಕ
               </span>
-              <p className="lobby-brand kn">ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</p>
+              <p className="lobby-brand kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</p>
             </div>
             <h1 className="kn">ಕೌಂಟರ್ ಮುಚ್ಚಿದೆ</h1>
             <p className="lobby-waiting-kn kn">
-              ದಯವಿಟ್ಟು ಸಿಬ್ಬಂದಿ ಈ ಕೌಂಟರ್ ತೆರೆಯುವವರೆಗೆ ಕಾಯಿರಿ.
+              ದಯವಿಟ್ಟು ಸಿಬ್ಬಂದಿಯವರು ಈ ಕೌಂಟರ್ ತೆರೆಯುವವರೆಗೆ ಕಾಯಿರಿ.
             </p>
             <p className="lobby-waiting-en">Lobby closed — waiting for staff to open the counter.</p>
             {apiOnline === false && <p className="api-warning">Service offline</p>}
@@ -515,11 +524,11 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
             ಕ
           </span>
           <div>
-            <p className="lobby-brand kn">ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</p>
+            <p className="lobby-brand kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</p>
             <p className="lobby-phase">
               {phase === "idle" && "ಸಿದ್ಧ · Waiting for customer"}
               {phase === "greeting" && `${activeGreet.title_kn}…`}
-              {phase === "conversation" && "Hands-free · ಹಸ್ತರಹಿತ"}
+              {phase === "conversation" && "ಕೈ ಬಳಸದೆ · Hands-free"}
             </p>
           </div>
         </div>
@@ -566,7 +575,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
                 <h1>{activeGreet.title_kn}</h1>
                 {phase === "idle" ? (
                   <>
-                    <p className="lobby-invite-kn">ಕ್ಯಾಮೆರಾ ಎದುರು ನಿಂತು ಪ್ರಾರಂಭಿಸಿ</p>
+                    <p className="lobby-invite-kn">ಕ್ಯಾಮೆರಾದ ಎದುರು ನಿಂತು ಪ್ರಾರಂಭಿಸಿ</p>
                     <p className="lobby-invite-en">Tap once for sound, then step into view.</p>
                     <button type="button" className="lobby-cta" onClick={() => void handleManualStart()}>
                       ಪ್ರಾರಂಭಿಸಿ · Start
@@ -600,7 +609,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
               </div>
               <div className="lobby-presence-meta">
                 <p className="lobby-presence-title">
-                  {presence === "present" ? "ಗ್ರಾಹಕರು ಕಂಡುಬಂದರು" : "Presence window"}
+                  {presence === "present" ? "ಗ್ರಾಹಕರು ಬಂದಿದ್ದಾರೆ" : "Presence window"}
                 </p>
                 <p className="lobby-presence-hint">
                   {cameraError

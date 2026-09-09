@@ -50,6 +50,12 @@ import os
 import sys
 import time
 
+_PROJECT_ROOT = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..")
+)
+if _PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, _PROJECT_ROOT)
+
 import jiwer
 from tabulate import tabulate
 
@@ -58,15 +64,12 @@ from backend.stt.transcriber import KannadaTranscriber
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-_PROJECT_ROOT = os.path.abspath(
-    os.path.join(os.path.dirname(__file__), "..", "..")
-)
-
 # Mirrors MODEL_PATHS in __init__.py — kept explicit here so benchmark.py
 # can be run as a standalone script without importing the full package.
 _MODEL_PATHS: dict[str, str] = {
     "baseline": os.path.join(_PROJECT_ROOT, "models", "whisper-medium-ct2"),
     "specialized": os.path.join(_PROJECT_ROOT, "models", "whisper-medium-vaani-ct2"),
+    "vasista-medium": os.path.join(_PROJECT_ROOT, "models", "whisper-kannada-medium-ct2"),
 }
 
 # beam_size used for all benchmark runs (accuracy-focused, not latency-focused)
@@ -353,7 +356,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--models",
-        choices=["baseline", "specialized", "all"],
+        choices=[*_MODEL_PATHS.keys(), "all"],
         default="all",
         help="Which model(s) to benchmark (default: all)",
     )

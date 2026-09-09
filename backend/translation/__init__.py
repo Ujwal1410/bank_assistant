@@ -29,7 +29,14 @@ from backend.translation.exceptions import TranslationInputError
 from backend.translation.translator import IndicTranslator
 from backend.translation.utils import is_empty_input, validate_direction
 
-__all__ = ["translate", "translate_kn_to_en", "translate_en_to_kn", "unload_model", "TranslationInputError"]
+__all__ = [
+    "translate",
+    "translate_kn_to_en",
+    "translate_en_to_kn",
+    "warm_model",
+    "unload_model",
+    "TranslationInputError",
+]
 
 # ---------------------------------------------------------------------------
 # Model ID registry
@@ -49,6 +56,20 @@ MODEL_IDS: dict[tuple[str, str], str] = {
 # checkpoint, never shared.
 # ---------------------------------------------------------------------------
 _model_cache: dict[str, IndicTranslator] = {}
+
+
+def warm_model(direction: str = "kn_to_en") -> str:
+    """Load and cache a translation model without running inference."""
+    directions = {
+        "kn_to_en": ("kan_Knda", "eng_Latn"),
+        "en_to_kn": ("eng_Latn", "kan_Knda"),
+    }
+    if direction not in directions:
+        raise ValueError(f"Unknown translation direction {direction!r}.")
+    model_id = MODEL_IDS[directions[direction]]
+    if model_id not in _model_cache:
+        _model_cache[model_id] = IndicTranslator(model_id)
+    return model_id
 
 
 def translate(
@@ -119,7 +140,8 @@ def translate(
     model_id = MODEL_IDS[(src_lang, tgt_lang)]
 
     if model_id not in _model_cache:
-        _model_cache[model_id] = IndicTranslator(model_id)
+        direction = "kn_to_en" if src_lang == "kan_Knda" else "en_to_kn"
+        warm_model(direction)
 
     # --- Translate and return the single string ---
     return _model_cache[model_id].translate([text], src_lang, tgt_lang)[0]

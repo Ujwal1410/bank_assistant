@@ -44,15 +44,27 @@ class EndBody(BaseModel):
     note: str = ""
 
 
-def _cache_path(slot: str, variant: int) -> str:
-    return os.path.join(GREET_DIR, f"{slot}_{variant}.wav")
+def _current_speaker() -> str:
+    from api.app_settings import get_tts_speaker
+
+    return get_tts_speaker()
+
+
+def _cache_path(slot: str, variant: int, speaker: str | None = None) -> str:
+    selected = speaker or _current_speaker()
+    return os.path.join(GREET_DIR, f"{slot}_{variant}_{selected.lower()}.wav")
 
 
 def _read_cache(slot: str, variant: int) -> str | None:
-    path = _cache_path(slot, variant)
-    if os.path.isfile(path) and os.path.getsize(path) > 1000:
-        with open(path, "rb") as f:
-            return base64.b64encode(f.read()).decode("ascii")
+    speaker = _current_speaker()
+    paths = [_cache_path(slot, variant, speaker)]
+    # Existing unlabelled greeting files were generated with the Suresh default.
+    if speaker == "Suresh":
+        paths.append(os.path.join(GREET_DIR, f"{slot}_{variant}.wav"))
+    for path in paths:
+        if os.path.isfile(path) and os.path.getsize(path) > 1000:
+            with open(path, "rb") as f:
+                return base64.b64encode(f.read()).decode("ascii")
     return None
 
 
@@ -78,16 +90,17 @@ def _generate_variant(slot: str, variant: int) -> dict:
 
     greet = pick_greeting(slot=slot, variant=variant)  # type: ignore[arg-type]
     line_kn = greet.get("line_kn") or ""
+    speaker = _current_speaker()
 
     if remote_tts_configured() and line_kn.strip():
         try:
             from backend.tts.speak_cache import kannada_to_b64
 
-            audio_b64 = kannada_to_b64(line_kn)
+            audio_b64 = kannada_to_b64(line_kn, speaker=speaker)
             if audio_b64:
                 try:
                     os.makedirs(GREET_DIR, exist_ok=True)
-                    with open(_cache_path(slot, variant), "wb") as f:
+                    with open(_cache_path(slot, variant, speaker), "wb") as f:
                         f.write(base64.b64decode(audio_b64))
                 except OSError:
                     pass
@@ -128,6 +141,7 @@ def _generate_variant(slot: str, variant: int) -> dict:
                 **os.environ,
                 **_OFFLINE_ENV,
                 "BANK_TTS_ENGINE": "mms",
+                "BANK_TTS_SPEAKER": speaker,
             },
             timeout=180,
         )
@@ -163,7 +177,7 @@ def _generate_variant(slot: str, variant: int) -> dict:
 
     try:
         os.makedirs(GREET_DIR, exist_ok=True)
-        with open(_cache_path(slot, variant), "wb") as f:
+        with open(_cache_path(slot, variant, speaker), "wb") as f:
             f.write(base64.b64decode(audio_b64))
     except OSError:
         pass

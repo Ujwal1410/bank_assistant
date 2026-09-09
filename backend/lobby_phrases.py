@@ -5,15 +5,24 @@ from __future__ import annotations
 # Spoken once after time-of-day greeting, before the first listen.
 ASK_NEED_KN = "ದಯವಿಟ್ಟು ಹೇಳಿ — ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು?"
 
-FORM_READY_KN = "ಅರ್ಜಿ ಸಿದ್ಧ. ಪ್ರಿಂಟ್ ಮಾಡಬಹುದು. ಮುಗಿಸು ಅಥವಾ ಮುಂದುವರಿಸಿ."
+FORM_READY_KN = (
+    "ಅರ್ಜಿ ಸಿದ್ಧವಾಗಿದೆ. ಇದನ್ನು ಮುದ್ರಿಸಬಹುದು. ಸೇವೆಯನ್ನು ಮುಗಿಸಲು ಮುಗಿಸು ಎಂದು ಹೇಳಿ "
+    "ಅಥವಾ ಮುಂದುವರಿಯಲು ನಿಮ್ಮ ಮುಂದಿನ ಪ್ರಶ್ನೆಯನ್ನು ಕೇಳಿ."
+)
 
-FORM_CONFIRM_SUFFIX_KN = "ಸರಿಯೇ? ಹೌದು ಅಥವಾ ಮತ್ತೆ ಹೇಳಿ."
+FORM_CONFIRM_SUFFIX_KN = (
+    "ಈ ಮಾಹಿತಿ ಸರಿಯಾಗಿದೆಯೇ? ಸರಿಯಾಗಿದ್ದರೆ ಹೌದು ಎಂದು ಹೇಳಿ; "
+    "ತಪ್ಪಿದ್ದರೆ ಮಾಹಿತಿಯನ್ನು ಮತ್ತೆ ಹೇಳಿ."
+)
 
-FORM_SUMMARY_OPENER_KN = "ನಿಮ್ಮ ಅರ್ಜಿ ಸಿದ್ಧ."
+FORM_SUMMARY_OPENER_KN = "ನಿಮ್ಮ ಅರ್ಜಿಯ ಸಾರಾಂಶ ಇಲ್ಲಿದೆ."
 
-FORM_SUMMARY_CLOSER_KN = "ಪ್ರಿಂಟ್ ಮಾಡಬಹುದು."
+FORM_SUMMARY_CLOSER_KN = "ದಯವಿಟ್ಟು ಎಲ್ಲಾ ವಿವರಗಳು ಸರಿಯಾಗಿವೆಯೇ ಎಂದು ಪರಿಶೀಲಿಸಿ."
 
-FORM_WHOLE_CONFIRM_KN = "ಎಲ್ಲಾ ಸರಿಯೇ? ಹೌದು ಎಂದರೆ ಮುಗಿಸಿ, ಇಲ್ಲ ಎಂದರೆ ಮತ್ತೆ ಹೇಳಿ."
+FORM_WHOLE_CONFIRM_KN = (
+    "ಎಲ್ಲ ಮಾಹಿತಿಯೂ ಸರಿಯಾಗಿದೆಯೇ? ಸರಿಯಾಗಿದ್ದರೆ ಹೌದು ಎಂದು ಹೇಳಿ; "
+    "ತಪ್ಪಿದ್ದರೆ ಇಲ್ಲ ಎಂದು ಹೇಳಿ."
+)
 
 # Pre-warm these on API startup so the first customer hears them instantly.
 def _greet_prewarm_lines() -> tuple[str, ...]:

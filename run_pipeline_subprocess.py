@@ -34,8 +34,18 @@ if len(sys.argv) > 2 and sys.argv[2].strip():
         context = json.loads(sys.argv[2])
     except json.JSONDecodeError:
         context = {}
+include_audio = len(sys.argv) <= 3 or sys.argv[3].strip().lower() not in {
+    "0",
+    "false",
+    "off",
+    "no",
+}
 
-result = run_pipeline(wav_path, context=context or None)
+result = run_pipeline(
+    wav_path,
+    context=context or None,
+    synthesise_audio=include_audio,
+)
 
 audio_b64 = ""
 if result.audio is not None:

@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import sys
+from typing import Literal
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
@@ -26,7 +27,10 @@ router = APIRouter()
 
 class SpeakBody(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
-    speaker: str | None = Field(default=None, description="Suresh or Anu")
+    speaker: Literal["Suresh", "Anu"] | None = Field(
+        default=None,
+        description="Suresh or Anu",
+    )
 
 
 def _parse_context_json(raw: str) -> dict:
@@ -52,16 +56,11 @@ async def speak_kannada(body: SpeakBody) -> dict:
         raise HTTPException(status_code=400, detail="Empty text")
     speaker = (body.speaker or "").strip() or get_tts_speaker()
     try:
-        # Temporarily apply requested speaker for this synthesis.
-        prev = os.environ.get("BANK_TTS_SPEAKER")
-        os.environ["BANK_TTS_SPEAKER"] = speaker
-        try:
-            audio_b64 = await asyncio.to_thread(kannada_to_b64, text)
-        finally:
-            if prev is None:
-                os.environ.pop("BANK_TTS_SPEAKER", None)
-            else:
-                os.environ["BANK_TTS_SPEAKER"] = prev
+        audio_b64 = await asyncio.to_thread(
+            kannada_to_b64,
+            text,
+            speaker=speaker,
+        )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"TTS failed: {exc}") from exc
     if not audio_b64:
@@ -96,7 +95,7 @@ async def transcribe_audio(audio: UploadFile = File(...)) -> dict:
                     from backend.stt import transcribe
                     from backend.translation import translate_kn_to_en
 
-                    kn = transcribe(tmp_wav, model="specialized", beam_size=1) or ""
+                    kn = transcribe(tmp_wav, beam_size=1) or ""
                     en = translate_kn_to_en(kn) if kn.strip() else ""
                     return {
                         "kannada_text": kn,
@@ -111,7 +110,7 @@ async def transcribe_audio(audio: UploadFile = File(...)) -> dict:
                 from backend.stt import transcribe
                 from backend.translation import translate_kn_to_en
 
-                kn = transcribe(tmp_wav, model="specialized", beam_size=1) or ""
+                kn = transcribe(tmp_wav, beam_size=1) or ""
                 en = translate_kn_to_en(kn) if kn.strip() else ""
                 return {
                     "kannada_text": kn,
@@ -133,6 +132,7 @@ async def process_audio(
     audio: UploadFile = File(...),
     context: str = Form(""),
     kiosk_session_id: str = Form(""),
+    include_audio: bool = Form(True),
 ) -> dict:
     """Accept audio upload, run pipeline (warm worker by default), return JSON."""
     if not audio.filename:
@@ -143,6 +143,9 @@ async def process_audio(
         raise HTTPException(status_code=400, detail="Empty audio file")
 
     ctx = _parse_context_json(context)
+    from api.app_settings import get_tts_speaker
+
+    tts_speaker = get_tts_speaker()
     if kiosk_session_id.strip():
         ctx["kiosk_session_id"] = kiosk_session_id.strip()
 
@@ -155,12 +158,27 @@ async def process_audio(
     try:
         if worker_enabled():
             try:
-                result = await asyncio.to_thread(process_wav, tmp_wav, ctx or None)
+                result = await asyncio.to_thread(
+                    process_wav,
+                    tmp_wav,
+                    ctx or None,
+                    include_audio=include_audio,
+                )
             except Exception as warm_exc:
                 print(f"[pipeline] warm worker failed, oneshot fallback: {warm_exc}", file=sys.stderr)
-                result = await asyncio.to_thread(oneshot_process, tmp_wav, ctx or None)
+                result = await asyncio.to_thread(
+                    oneshot_process,
+                    tmp_wav,
+                    ctx or None,
+                    include_audio=include_audio,
+                )
         else:
-            result = await asyncio.to_thread(oneshot_process, tmp_wav, ctx or None)
+            result = await asyncio.to_thread(
+                oneshot_process,
+                tmp_wav,
+                ctx or None,
+                include_audio=include_audio,
+            )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {exc}") from exc
     finally:
@@ -168,6 +186,7 @@ async def process_audio(
 
     if ctx.get("kiosk_session_id"):
         result["kiosk_session_id"] = ctx["kiosk_session_id"]
+    result["tts_speaker"] = tts_speaker
 
     if not result.get("error"):
         try:

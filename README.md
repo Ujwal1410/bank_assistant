@@ -2,6 +2,8 @@
 
 A full AI/ML pipeline that takes spoken Kannada audio and returns a Kannada voice response for banking queries. Built as a college engineering project (AI/ML branch).
 
+**Complete project documentation:** [docs/END_TO_END_PROJECT_DOCUMENTATION.md](docs/END_TO_END_PROJECT_DOCUMENTATION.md) — problem statement, objectives, architecture, full technology stack, AI models, APIs, voice and form flows, setup, deployment, testing, security, limitations, and future scope.
+
 ---
 
 ## Pipeline Overview

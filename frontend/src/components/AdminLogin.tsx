@@ -101,7 +101,7 @@ export function AdminLogin({ apiOnline, onSuccess }: AdminLoginProps) {
             )}
           </div>
 
-          <h1 className="kn adm-login-title">ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</h1>
+          <h1 className="kn adm-login-title">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</h1>
           <p className="adm-login-tagline">Staff console · voice-first counter</p>
 
           <ul className="adm-login-perks">

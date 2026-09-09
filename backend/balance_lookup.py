@@ -6,6 +6,8 @@ import json
 import os
 import re
 
+from backend.forms.summary_kn import amount_speak_kn, digits_to_kannada_words
+
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _ACCOUNTS_PATH = os.path.join(_PROJECT_ROOT, "data", "demo_accounts.json")
 
@@ -19,16 +21,29 @@ def _normalize_account(raw: str) -> str:
 
 def lookup_balance(account_number: str) -> dict:
     acct = _normalize_account(account_number)
-    if not acct or len(acct) < 8:
+    try:
+        expected_length = max(4, int(os.environ.get("BANK_DEMO_ACCOUNT_LENGTH", "10")))
+    except ValueError:
+        expected_length = 10
+    if len(acct) != expected_length:
+        expected_length_kn = (
+            "ಹತ್ತು"
+            if expected_length == 10
+            else digits_to_kannada_words(str(expected_length))
+        )
         return {
             "found": False,
             "account_number": acct,
-            "message_en": "Please provide a valid account number with at least 8 digits.",
-            "message_kn": "ದಯವಿಟ್ಟು ಸರಿಯಾದ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ — ಕನಿಷ್ಠ ೮ ಅಂಕೆಗಳು.",
+            "message_en": f"Please provide a valid {expected_length}-digit account number.",
+            "message_kn": (
+                f"ದಯವಿಟ್ಟು {expected_length_kn} "
+                "ಅಂಕೆಗಳಿರುವ ಸರಿಯಾದ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
+            ),
         }
 
     row = _ACCOUNTS.get(acct)
     if not row:
+        spoken_acct = digits_to_kannada_words(acct)
         return {
             "found": False,
             "account_number": acct,
@@ -37,8 +52,8 @@ def lookup_balance(account_number: str) -> dict:
                 "Please check the number and try again."
             ),
             "message_kn": (
-                f"ಖಾತೆ ಸಂಖ್ಯೆ {acct} ನಮ್ಮ ದಾಖಲೆಗಳಲ್ಲಿ ಕಂಡುಬಂದಿಲ್ಲ. "
-                "ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+                f"ಖಾತೆ ಸಂಖ್ಯೆ {spoken_acct} ನಮ್ಮ ದಾಖಲೆಗಳಲ್ಲಿ ಕಂಡುಬಂದಿಲ್ಲ. "
+                "ದಯವಿಟ್ಟು ಸಂಖ್ಯೆಯನ್ನು ಪರಿಶೀಲಿಸಿ ಮತ್ತೆ ಹೇಳಿ."
             ),
         }
 
@@ -46,6 +61,8 @@ def lookup_balance(account_number: str) -> dict:
     bal_str = f"{bal:,.2f}"
     name_kn = row.get("holder_name_kn") or row.get("holder_name", "")
     name_en = row.get("holder_name", "")
+    spoken_acct = digits_to_kannada_words(acct)
+    spoken_balance = amount_speak_kn(str(bal))
 
     return {
         "found": True,
@@ -59,7 +76,7 @@ def lookup_balance(account_number: str) -> dict:
             f"Your available balance is {bal_str} rupees."
         ),
         "message_kn": (
-            f"ಖಾತೆ ಸಂಖ್ಯೆ {acct}. {name_kn} ಅವರ ಖಾತೆಯಲ್ಲಿ "
-            f"ಪ್ರಸ್ತುತ ಲಭ್ಯ ಬಾಕಿ {bal_str} ರೂಪಾಯಿ."
+            f"ಖಾತೆ ಸಂಖ್ಯೆ {spoken_acct}. {name_kn} ಅವರ ಖಾತೆಯಲ್ಲಿ "
+            f"ಪ್ರಸ್ತುತ ಲಭ್ಯವಿರುವ ಶಿಲ್ಕು {spoken_balance}."
         ),
     }

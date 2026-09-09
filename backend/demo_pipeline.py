@@ -119,7 +119,7 @@ def run_clip(wav_path: str, verbose: bool = True) -> dict:
 
     # ── Stage 1: STT ─────────────────────────────────────────────────────────
     try:
-        stt_output = transcribe(wav_path, model="specialized", beam_size=1)
+        stt_output = transcribe(wav_path, beam_size=1)
         result["stt_output"] = stt_output
     except Exception as e:
         result["errors"].append(f"STT: {e}")

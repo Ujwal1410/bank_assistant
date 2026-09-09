@@ -10,6 +10,8 @@ import { startVisibilityAwarePoll } from "./utils/polling";
 export default function App() {
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
   const failStreak = useRef(0);
+  const hasConnected = useRef(false);
+  const startupGraceUntil = useRef(Date.now() + 60_000);
 
   useEffect(() => {
     let cancelled = false;
@@ -17,12 +19,14 @@ export default function App() {
 
     const applyHealth = (ok: boolean) => {
       if (ok) {
+        hasConnected.current = true;
         failStreak.current = 0;
         setApiOnline(true);
         return;
       }
+      if (!hasConnected.current && Date.now() < startupGraceUntil.current) return;
       failStreak.current += 1;
-      if (failStreak.current >= 2) {
+      if (failStreak.current >= 3) {
         setApiOnline(false);
       }
     };

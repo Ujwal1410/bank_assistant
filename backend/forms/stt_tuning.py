@@ -12,6 +12,10 @@ NAME_FIELD_IDS = frozenset(
         "nominee_name",
     }
 )
+MOBILE_FIELD_IDS = frozenset({"mobile_number", "old_mobile", "new_mobile"})
+ACCOUNT_FIELD_IDS = frozenset(
+    {"account_number", "remitter_account", "beneficiary_account"}
+)
 
 
 def form_fill_beam_size(field_type: str, field_id: str) -> int:
@@ -23,3 +27,55 @@ def form_fill_beam_size(field_type: str, field_id: str) -> int:
     if fid in NAME_FIELD_IDS or ftype == "text":
         return 5
     return 3
+
+
+def form_fill_stt_hints(field_type: str, field_id: str) -> tuple[str | None, str | None]:
+    """Return field-aware Whisper context without changing general conversation."""
+    fid = (field_id or "").lower()
+    ftype = (field_type or "text").lower()
+    if ftype == "date" or "date" in fid:
+        return (
+            "ಇದು ಬ್ಯಾಂಕ್ ಅರ್ಜಿಯ ದಿನಾಂಕ. ಉತ್ತರದಲ್ಲಿ ದಿನ, ತಿಂಗಳು ಮತ್ತು ನಾಲ್ಕು ಅಂಕಿಯ ವರ್ಷ ಇದೆ.",
+            (
+                "ದಿನಾಂಕ ಜನ್ಮ ದಿನಾಂಕ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು ಏಳು ಎಂಟು ಒಂಬತ್ತು "
+                "ಹತ್ತು ಹನ್ನೊಂದು ಹನ್ನೆರಡು ಹದಿಮೂರು ಹದಿನಾಲ್ಕು ಹದಿನೈದು ಹದಿನಾರು "
+                "ಹದಿನೇಳು ಹದಿನೆಂಟು ಹತ್ತೊಂಬತ್ತು ಇಪ್ಪತ್ತು ಮೂವತ್ತು "
+                "ಸಾವಿರ ಎರಡು ಸಾವಿರ ಎರಡು ಸಾವಿರ ಮೂರು"
+            ),
+        )
+    if ftype == "digits":
+        if fid in MOBILE_FIELD_IDS:
+            return (
+                "ಇದು ಹತ್ತು ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆ. ಪ್ರತಿಯೊಂದು ಅಂಕಿಯನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ ಹೇಳಲಾಗಿದೆ.",
+                (
+                    "ಸೊನ್ನೆ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು ಏಳು ಎಂಟು ಒಂಬತ್ತು "
+                    "zero one two three four five six seven eight nine"
+                ),
+            )
+        return (
+            "ಇದು ಬ್ಯಾಂಕ್ ಅರ್ಜಿಯ ಸಂಖ್ಯೆ. ಪ್ರತಿಯೊಂದು ಅಂಕಿಯನ್ನು ಕನ್ನಡದಲ್ಲಿ ಹೇಳಲಾಗಿದೆ.",
+            "ಸೊನ್ನೆ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು ಏಳು ಎಂಟು ಒಂಬತ್ತು",
+        )
+    return None, None
+
+
+def plausible_digit_capture(digits: str, field_id: str) -> bool:
+    """Whether a numeric transcript has a plausible field-specific length."""
+    fid = (field_id or "").lower()
+    if fid in MOBILE_FIELD_IDS:
+        return len(digits) == 10
+    if fid in ACCOUNT_FIELD_IDS:
+        return 8 <= len(digits) <= 18
+    if fid == "number_of_leaves":
+        return digits in {"10", "25", "50"}
+    return bool(digits)
+
+
+def english_digit_retry_hints(field_id: str) -> tuple[str, str]:
+    """Context for a same-model English decode when Kannada digit decode fails."""
+    fid = (field_id or "").lower()
+    subject = "ten digit mobile number" if fid in MOBILE_FIELD_IDS else "banking number"
+    return (
+        f"The speaker is saying a {subject}, one digit at a time.",
+        "zero one two three four five six seven eight nine",
+    )

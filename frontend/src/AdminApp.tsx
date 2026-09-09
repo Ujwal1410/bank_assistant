@@ -16,10 +16,25 @@ export function AdminApp() {
   useEffect(() => {
     let cancelled = false;
     let attempts = 0;
+    let consecutiveFailures = 0;
+    let hasConnected = false;
+    const startupGraceUntil = Date.now() + 60_000;
+    const recordHealth = (ok: boolean) => {
+      if (cancelled) return;
+      if (ok) {
+        hasConnected = true;
+        consecutiveFailures = 0;
+        setConnected(true);
+        return;
+      }
+      if (!hasConnected && Date.now() < startupGraceUntil) return;
+      consecutiveFailures += 1;
+      if (consecutiveFailures >= 3) setConnected(false);
+    };
     const probe = () => {
       checkHealth().then((ok) => {
         if (cancelled) return;
-        setConnected(ok);
+        recordHealth(ok);
         if (!ok && attempts < 10) {
           attempts += 1;
           window.setTimeout(probe, 1500);
@@ -29,7 +44,7 @@ export function AdminApp() {
     probe();
     const stop = startVisibilityAwarePoll(() => {
       checkHealth().then((ok) => {
-        if (!cancelled) setConnected(ok);
+        recordHealth(ok);
       });
     }, 10000, 30000);
     return () => {
@@ -80,7 +95,7 @@ export function AdminApp() {
             ಕ
           </span>
           <div>
-            <strong className="kn">ಕನ್ನಡ ವಾಯ್ಸ್ ಬ್ಯಾಂಕಿಂಗ್</strong>
+            <strong className="kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</strong>
             <span>Voice banking</span>
           </div>
         </div>
@@ -98,7 +113,7 @@ export function AdminApp() {
               />
             </svg>
             <span>
-              <span className="kn">ಲಂಬಿ ನಿಯಂತ್ರಣ</span>
+              <span className="kn">ಲಾಬಿ ನಿಯಂತ್ರಣ</span>
               <span className="adm-nav-sub">Lobby control</span>
             </span>
           </a>
@@ -133,7 +148,7 @@ export function AdminApp() {
         <header className="adm-topbar">
           <div className="adm-topbar-titles">
             <p className="adm-topbar-crumb">Staff · Dashboard</p>
-            <h1 className="kn">ಲಂಬಿ ನಿಯಂತ್ರಣ</h1>
+            <h1 className="kn">ಲಾಬಿ ನಿಯಂತ್ರಣ</h1>
           </div>
           <div className="adm-topbar-actions">
             <span className="adm-user-chip">{username}</span>

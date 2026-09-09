@@ -24,12 +24,13 @@ def warm_parler_service(*, extra_phrases: tuple[str, ...] = ()) -> dict[str, Any
         return {"ok": False, "error": "Parler not available on this machine"}
 
     phrases = tuple(PREWARM_PHRASES) + tuple(extra_phrases)
-    n = prewarm_phrases(phrases)
+    speaker = default_speaker()
+    n = prewarm_phrases(phrases, speaker=speaker)
     elapsed = round(time.perf_counter() - t0, 1)
     return {
         "ok": True,
         "ready": parler_ready(),
-        "speaker": default_speaker(),
+        "speaker": speaker,
         "phrases_cached": n,
         "elapsed_s": elapsed,
     }
@@ -73,6 +74,7 @@ def wait_for_remote_tts_ready(
 def warm_via_remote_phrases(*, extra_phrases: tuple[str, ...] = ()) -> dict[str, Any]:
     """After remote TTS is ready, cache common phrases on the kiosk API."""
     from backend.lobby_phrases import PREWARM_PHRASES
+    from backend.tts.parler_bridge import default_speaker
     from backend.tts.remote_bridge import remote_tts_configured
     from backend.tts.speak_cache import prewarm_phrases
 
@@ -86,7 +88,7 @@ def warm_via_remote_phrases(*, extra_phrases: tuple[str, ...] = ()) -> dict[str,
 
     phrases = tuple(PREWARM_PHRASES) + tuple(extra_phrases)
     try:
-        n = prewarm_phrases(phrases)
+        n = prewarm_phrases(phrases, speaker=default_speaker())
     except Exception as exc:
         return {"ok": False, "error": str(exc)}
 

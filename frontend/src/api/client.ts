@@ -23,6 +23,7 @@ export interface PipelineResult {
   error: string | null;
   history_id?: number | string | null;
   kiosk_session_id?: string;
+  tts_speaker?: "Suresh" | "Anu";
 }
 
 /** Dialog context so the backend knows what the customer is doing. */
@@ -163,6 +164,7 @@ export async function processAudio(
   audioBlob: Blob,
   filename = "recording.webm",
   context?: PipelineContext,
+  options?: { includeAudio?: boolean; signal?: AbortSignal },
 ): Promise<PipelineResult> {
   const formData = new FormData();
   formData.append("audio", audioBlob, filename);
@@ -172,11 +174,15 @@ export async function processAudio(
   if (context?.kiosk_session_id) {
     formData.append("kiosk_session_id", context.kiosk_session_id);
   }
+  if (options?.includeAudio === false) {
+    formData.append("include_audio", "false");
+  }
 
   const res = await fetchWithTimeout(`${API_BASE}/api/process-audio`, {
     method: "POST",
     body: formData,
-    timeoutMs: 0,
+    timeoutMs: 120_000,
+    signal: options?.signal,
   });
 
   if (!res.ok) {
@@ -364,7 +370,9 @@ export interface FormSubmissionItem {
 }
 
 export async function fetchFormSubmissions(limit = 50): Promise<FormSubmissionItem[]> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
   const res = await fetchWithTimeout(`${API_BASE}/api/forms/submissions?limit=${limit}`, {
+    headers: adminAuthHeaders(),
     timeoutMs: 15000,
   });
   if (!res.ok) throw new Error("Failed to load form submissions");
@@ -461,8 +469,7 @@ export async function fetchFormSummary(
   return res.json();
 }
 
-const speakCache = new Map<string, string>();
-const SPEAK_CACHE_MAX = 64;
+const speakInFlight = new Map<string, Promise<string>>();
 
 function speakCacheKey(text: string, speaker?: string): string {
   return `${speaker ?? ""}\0${text}`;
@@ -474,29 +481,32 @@ export async function fetchSpeakKannada(
   speaker?: string,
 ): Promise<string> {
   const key = speakCacheKey(text, speaker);
-  const cached = speakCache.get(key);
-  if (cached) return cached;
+  const existing = speakInFlight.get(key);
+  if (existing) return existing;
 
-  const res = await fetchWithTimeout(`${API_BASE}/api/speak-kannada`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, speaker: speaker || undefined }),
-    timeoutMs: 0,
-    signal,
-  });
-  if (!res.ok) {
-    throw new Error(await parseApiError(res, `TTS failed (${res.status})`));
-  }
-  const data = await res.json();
-  const audio = (data.audio_b64 as string) ?? "";
-  if (audio) {
-    if (speakCache.size >= SPEAK_CACHE_MAX) {
-      const oldest = speakCache.keys().next().value;
-      if (oldest) speakCache.delete(oldest);
+  const request = (async () => {
+    const res = await fetchWithTimeout(`${API_BASE}/api/speak-kannada`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, speaker: speaker || undefined }),
+      timeoutMs: 90_000,
+      signal,
+    });
+    if (!res.ok) {
+      throw new Error(await parseApiError(res, `TTS failed (${res.status})`));
     }
-    speakCache.set(key, audio);
+    const data = await res.json();
+    return (data.audio_b64 as string) ?? "";
+  })();
+  if (signal) return request;
+  speakInFlight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (speakInFlight.get(key) === request) {
+      speakInFlight.delete(key);
+    }
   }
-  return audio;
 }
 
 export interface VoiceOption {
@@ -559,6 +569,7 @@ export interface FormFillResult {
   english_text: string;
   value: string;
   error?: string | null;
+  validation_error?: string | null;
 }
 
 /**
@@ -601,6 +612,7 @@ export async function fillFormFieldAudio(
         english_text: (data.english_text ?? "").trim(),
         value: (data.value ?? "").trim(),
         error: data.error ?? null,
+        validation_error: data.validation_error ?? null,
       };
     } catch (err) {
       if (attempt === 0 && err instanceof Error && !err.message.includes("422")) {

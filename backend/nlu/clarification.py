@@ -14,7 +14,7 @@ INTENT_PHRASES_EN: dict[str, str] = {
 
 INTENT_PHRASES_KN: dict[str, str] = {
     "open_account": "ಹೊಸ ಖಾತೆ ತೆರೆಯುವುದು",
-    "check_balance": "ಬ್ಯಾಲೆನ್ಸ್ ತಿಳಿಯುವುದು",
+    "check_balance": "ಖಾತೆಯ ಶಿಲ್ಕು ತಿಳಿಯುವುದು",
     "apply_loan": "ಸಾಲ ಅರ್ಜಿ",
     "deposit_money": "ಠೇವಣಿ",
     "withdraw_money": "ಹಣ ಹಿಂಪಡೆಯುವುದು",
@@ -31,8 +31,8 @@ def build_clarification(top: list[tuple[str, float]], attempt: int = 0) -> tuple
             "for example: check balance, open account, loan, deposit, or withdraw."
         )
         kn = (
-            "ಇನ್ನೂ ಸ್ಪಷ್ಟವಾಗಿ ಕೇಳಲಾಗಲಿಲ್ಲ. ಒಂದು ಸೇವೆಯನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ — "
-            "ಉದಾಹರಣೆ: ಬ್ಯಾಲೆನ್ಸ್, ಖಾತೆ ತೆರೆಯುವುದು, ಸಾಲ, ಠೇವಣಿ, ಅಥವಾ ಹಿಂಪಡೆಯುವಿಕೆ."
+            "ನೀವು ಹೇಳಿದ್ದು ಇನ್ನೂ ಸ್ಪಷ್ಟವಾಗಿ ಅರ್ಥವಾಗಲಿಲ್ಲ. ಒಂದು ಸೇವೆಯನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ — "
+            "ಉದಾಹರಣೆಗೆ: ಖಾತೆಯ ಶಿಲ್ಕು, ಖಾತೆ ತೆರೆಯುವುದು, ಸಾಲ, ಠೇವಣಿ, ಅಥವಾ ಹಣ ಹಿಂಪಡೆಯುವುದು."
         )
         return en, kn
 
@@ -43,7 +43,7 @@ def build_clarification(top: list[tuple[str, float]], attempt: int = 0) -> tuple
         )
         kn = (
             "ಕ್ಷಮಿಸಿ, ಸ್ಪಷ್ಟವಾಗಿ ಅರ್ಥವಾಗಲಿಲ್ಲ. "
-            "ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ — ಉದಾಹರಣೆ: ಬ್ಯಾಲೆನ್ಸ್, ಖಾತೆ ತೆರೆಯುವುದು, ಸಾಲ, ಅಥವಾ ಠೇವಣಿ."
+            "ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ — ಉದಾಹರಣೆಗೆ: ಖಾತೆಯ ಶಿಲ್ಕು, ಖಾತೆ ತೆರೆಯುವುದು, ಸಾಲ, ಅಥವಾ ಠೇವಣಿ."
         )
         return en, kn
 
@@ -55,11 +55,11 @@ def build_clarification(top: list[tuple[str, float]], attempt: int = 0) -> tuple
 
     if attempt >= 1:
         en = f"I heard you, but need one choice: {a_en} or {b_en}?"
-        kn = f"ಒಂದು ಆಯ್ಕೆ ಹೇಳಿ: {a_kn} ಅಥವಾ {b_kn}?"
+        kn = f"ಒಂದು ಆಯ್ಕೆಯನ್ನು ಹೇಳಿ: {a_kn} ಅಥವಾ {b_kn}?"
         return en, kn
 
     en = f"Did you mean {a_en} or {b_en}? Please say again clearly."
-    kn = f"ನೀವು {a_kn} ಅಥವಾ {b_kn} ಹೇಳಿದ್ದೀರಾ? ದಯವಿಟ್ಟು ಮತ್ತೆ ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ."
+    kn = f"ನೀವು {a_kn} ಅಥವಾ {b_kn} ಸೇವೆಯನ್ನು ಕೇಳುತ್ತಿದ್ದೀರಾ? ದಯವಿಟ್ಟು ಮತ್ತೆ ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ."
     return en, kn
 
 

@@ -13,9 +13,9 @@
       "id": "balance_inquiry",
       "category": "inquiry",
       "source_note": "Demo balance lookup — account number then simulated core banking response",
-      "title_kn": "ಖಾತೆ ಬಾಕಿ ಪರಿಶೀಲನೆ",
+      "title_kn": "ಖಾತೆಯ ಶಿಲ್ಕು ಪರಿಶೀಲನೆ",
       "title_en": "Balance inquiry",
-      "description_kn": "ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆ ನೀಡಿ — ಬಾಕಿ ತಿಳಿಸುತ್ತೇವೆ.",
+      "description_kn": "ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ — ಲಭ್ಯವಿರುವ ಶಿಲ್ಕನ್ನು ತಿಳಿಸುತ್ತೇವೆ.",
       "description_en": "Provide your account number to hear your available balance.",
       "fields": [
         {
@@ -32,9 +32,9 @@
       "id": "cash_withdrawal",
       "category": "counter_slip",
       "source_note": "Cash withdrawal slip — standard branch counter form (e.g. Bank of Maharashtra / PSB style)",
-      "title_kn": "ನಗದು ಹಿಂಪಡೆಯುವ ಸ್ಲಿಪ್",
+      "title_kn": "ನಗದು ಹಿಂಪಡೆಯುವ ಚೀಟಿ",
       "title_en": "Cash withdrawal slip",
-      "description_kn": "ಖಾತೆಯಿಂದ ನಗದು ಹಿಂಪಡೆಯಲು ಬ್ರಾಂಚ್‌ನಲ್ಲಿ ಬಳಸುವ ಸ್ಲಿಪ್.",
+      "description_kn": "ಖಾತೆಯಿಂದ ನಗದು ಹಿಂಪಡೆಯಲು ಬ್ಯಾಂಕ್ ಶಾಖೆಯಲ್ಲಿ ಬಳಸುವ ಚೀಟಿ.",
       "description_en": "Branch counter slip to withdraw cash from your account.",
       "fields": [
         {
@@ -84,9 +84,9 @@
       "id": "cash_deposit",
       "category": "counter_slip",
       "source_note": "Cash / cheque deposit slip — standard branch counter form",
-      "title_kn": "ನಗದು / ಚೆಕ್ ಠೇವಣಿ ಸ್ಲಿಪ್",
+      "title_kn": "ನಗದು / ಚೆಕ್ ಠೇವಣಿ ಚೀಟಿ",
       "title_en": "Cash / cheque deposit slip",
-      "description_kn": "ಖಾತೆಗೆ ನಗದು ಅಥವಾ ಚೆಕ್ ಠೇವಣಿ ಮಾಡಲು ಬ್ರಾಂಚ್ ಸ್ಲಿಪ್.",
+      "description_kn": "ಖಾತೆಗೆ ನಗದು ಅಥವಾ ಚೆಕ್ ಠೇವಣಿ ಮಾಡಲು ಬ್ಯಾಂಕ್ ಶಾಖೆಯಲ್ಲಿ ಬಳಸುವ ಚೀಟಿ.",
       "description_en": "Branch slip to deposit cash or cheque into an account.",
       "fields": [
         {
@@ -138,7 +138,7 @@
       "source_note": "Simplified individual Account Opening Form (AOF) — common fields from PSB / Axis / Indian Bank individual AOF (name, DOB, address, mobile, PAN, account type). Full KYC annexures omitted for voice demo.",
       "title_kn": "ವೈಯಕ್ತಿಕ ಖಾತೆ ತೆರೆಯುವ ಅರ್ಜಿ",
       "title_en": "Individual account opening form",
-      "description_kn": "ಹೊಸ ಸೇವಿಂಗ್ಸ್ / ಕರೆಂಟ್ ಖಾತೆಗೆ ಅಗತ್ಯವಿರುವ ಮೂಲ ವಿವರಗಳು.",
+      "description_kn": "ಹೊಸ ಉಳಿತಾಯ / ಚಾಲ್ತಿ ಖಾತೆ ತೆರೆಯಲು ಅಗತ್ಯವಿರುವ ಮೂಲ ವಿವರಗಳು.",
       "description_en": "Core fields from a resident individual account opening form (Savings / Current).",
       "fields": [
         {
@@ -185,7 +185,7 @@
           "id": "account_type",
           "label_kn": "ಖಾತೆ ವಿಧ",
           "label_en": "Account type",
-          "prompt_kn": "ಸೇವಿಂಗ್ಸ್, ಕರೆಂಟ್ ಅಥವಾ ಸ್ಯಾಲರಿ ಖಾತೆ ಎಂದು ಹೇಳಿ",
+          "prompt_kn": "ಉಳಿತಾಯ, ಚಾಲ್ತಿ ಅಥವಾ ವೇತನ ಖಾತೆ ಎಂದು ಹೇಳಿ",
           "type": "text",
           "required": true
         },
@@ -206,7 +206,7 @@
       "source_note": "Simplified retail loan application — fields common across home / personal / education / vehicle loan forms published by PSBs.",
       "title_kn": "ಚಿಲ್ಲರೆ ಸಾಲ ಅರ್ಜಿ",
       "title_en": "Retail loan application",
-      "description_kn": "ಹೋಮ್ / ವೈಯಕ್ತಿಕ / ಶಿಕ್ಷಣ / ವಾಹನ ಸಾಲಕ್ಕೆ ಮೂಲ ಅರ್ಜಿ ವಿವರಗಳು.",
+      "description_kn": "ಗೃಹ / ವೈಯಕ್ತಿಕ / ಶಿಕ್ಷಣ / ವಾಹನ ಸಾಲಕ್ಕೆ ಅಗತ್ಯವಿರುವ ಮೂಲ ವಿವರಗಳು.",
       "description_en": "Core retail loan application fields (type, amount, income, contact).",
       "fields": [
         {
@@ -229,7 +229,7 @@
           "id": "loan_type",
           "label_kn": "ಸಾಲದ ವಿಧ",
           "label_en": "Loan type",
-          "prompt_kn": "ಹೋಮ್ ಸಾಲ, ವೈಯಕ್ತಿಕ ಸಾಲ, ಶಿಕ್ಷಣ ಸಾಲ ಅಥವಾ ಕಾರ್ ಸಾಲ ಎಂದು ಹೇಳಿ",
+          "prompt_kn": "ಗೃಹ ಸಾಲ, ವೈಯಕ್ತಿಕ ಸಾಲ, ಶಿಕ್ಷಣ ಸಾಲ ಅಥವಾ ವಾಹನ ಸಾಲ ಎಂದು ಹೇಳಿ",
           "type": "text",
           "required": true
         },
@@ -266,7 +266,7 @@
       "source_note": "RTGS / NEFT application form — remitter + beneficiary + IFSC + amount (Axis / BoM / UCO style)",
       "title_kn": "RTGS / NEFT ವರ್ಗಾವಣೆ ಅರ್ಜಿ",
       "title_en": "RTGS / NEFT transfer form",
-      "description_kn": "ಇನ್ನೊಂದು ಖಾತೆಗೆ ಹಣ ವರ್ಗಾವಣೆ ಮಾಡಲು ಬ್ರಾಂಚ್‌ನಲ್ಲಿ ಭರ್ತಿ ಮಾಡುವ ಅರ್ಜಿ.",
+      "description_kn": "ಇನ್ನೊಂದು ಖಾತೆಗೆ ಹಣ ವರ್ಗಾವಣೆ ಮಾಡಲು ಬ್ಯಾಂಕ್ ಶಾಖೆಯಲ್ಲಿ ಭರ್ತಿ ಮಾಡುವ ಅರ್ಜಿ.",
       "description_en": "Branch form to transfer money to another bank account via RTGS or NEFT.",
       "fields": [
         {
@@ -342,7 +342,7 @@
       "source_note": "Cheque book request — common customer service form (BoM / Indian Bank downloads)",
       "title_kn": "ಚೆಕ್ ಬುಕ್ ವಿನಂತಿ",
       "title_en": "Cheque book request",
-      "description_kn": "ಹೊಸ ಚೆಕ್ ಬುಕ್ ಬೇಕಾದಾಗ ಬ್ರಾಂಚ್‌ಗೆ ಸಲ್ಲಿಸುವ ವಿನಂತಿ.",
+      "description_kn": "ಹೊಸ ಚೆಕ್ ಪುಸ್ತಕ ಬೇಕಾದಾಗ ಬ್ಯಾಂಕ್ ಶಾಖೆಗೆ ಸಲ್ಲಿಸುವ ವಿನಂತಿ.",
       "description_en": "Request a new cheque book from your branch.",
       "fields": [
         {
@@ -363,9 +363,9 @@
         },
         {
           "id": "number_of_leaves",
-          "label_kn": "ಎಲೆಗಳ ಸಂಖ್ಯೆ",
+          "label_kn": "ಹಾಳೆಗಳ ಸಂಖ್ಯೆ",
           "label_en": "Number of leaves",
-          "prompt_kn": "ಹತ್ತು, ಇಪ್ಪತ್ತೈದು ಅಥವಾ ಐವತ್ತು ಎಲೆಗಳ ಚೆಕ್ ಬುಕ್ ಬೇಕೇ ಎಂದು ಹೇಳಿ",
+          "prompt_kn": "ಹತ್ತು, ಇಪ್ಪತ್ತೈದು ಅಥವಾ ಐವತ್ತು ಹಾಳೆಗಳ ಚೆಕ್ ಪುಸ್ತಕ ಬೇಕೇ ಎಂದು ಹೇಳಿ",
           "type": "digits",
           "required": true
         },
@@ -384,9 +384,9 @@
       "id": "atm_debit_card",
       "category": "service",
       "source_note": "ATM / Debit card application — common downloadable form across PSBs",
-      "title_kn": "ATM / ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಅರ್ಜಿ",
+      "title_kn": "ಎಟಿಎಂ / ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಅರ್ಜಿ",
       "title_en": "ATM / Debit card application",
-      "description_kn": "ಹೊಸ ATM ಅಥವಾ ಡೆಬಿಟ್ ಕಾರ್ಡ್‌ಗೆ ಅರ್ಜಿ.",
+      "description_kn": "ಹೊಸ ಎಟಿಎಂ ಅಥವಾ ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಪಡೆಯಲು ಸಲ್ಲಿಸುವ ಅರ್ಜಿ.",
       "description_en": "Apply for a new ATM or debit card linked to your account.",
       "fields": [
         {
@@ -417,7 +417,7 @@
           "id": "card_type",
           "label_kn": "ಕಾರ್ಡ್ ವಿಧ",
           "label_en": "Card type",
-          "prompt_kn": "ATM ಕಾರ್ಡ್ ಅಥವಾ ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಎಂದು ಹೇಳಿ",
+          "prompt_kn": "ಎಟಿಎಂ ಕಾರ್ಡ್ ಅಥವಾ ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಎಂದು ಹೇಳಿ",
           "type": "text",
           "required": true
         },
@@ -453,7 +453,7 @@
           "id": "account_number",
           "label_kn": "ಸಂಬಂಧಿತ ಖಾತೆ ಸಂಖ್ಯೆ",
           "label_en": "Linked account number",
-          "prompt_kn": "ನಿಮ್ಮ ಸೇವಿಂಗ್ಸ್ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ",
+          "prompt_kn": "ನಿಮ್ಮ ಉಳಿತಾಯ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ",
           "type": "digits",
           "required": true
         },
@@ -475,9 +475,9 @@
         },
         {
           "id": "interest_payout",
-          "label_kn": "ಬಡ್ಡಿ ಪಾವತಿ",
+          "label_kn": "ಬಡ್ಡಿ ಪಾವತಿ ವಿಧಾನ",
           "label_en": "Interest payout",
-          "prompt_kn": "ಮಾಸಿಕ, ತ್ರೈಮಾಸಿಕ ಅಥವಾ ಮೆಚ್ಯೂರಿಟಿ ಮೇಲೆ ಎಂದು ಹೇಳಿ",
+          "prompt_kn": "ಮಾಸಿಕ, ತ್ರೈಮಾಸಿಕ ಅಥವಾ ಅವಧಿ ಪೂರ್ಣಗೊಂಡಾಗ ಎಂದು ಹೇಳಿ",
           "type": "text",
           "required": true
         },
@@ -550,7 +550,7 @@
       "source_note": "Stop payment of cheque — common customer instruction form at branches",
       "title_kn": "ಚೆಕ್ ನಿಲ್ಲಿಸುವ ವಿನಂತಿ",
       "title_en": "Stop payment of cheque",
-      "description_kn": "ನೀಡಿದ ಚೆಕ್ ಪಾವತಿಯನ್ನು ನಿಲ್ಲಿಸಲು ಬ್ರಾಂಚ್ ವಿನಂತಿ.",
+      "description_kn": "ನೀವು ನೀಡಿದ ಚೆಕ್‌ನ ಪಾವತಿಯನ್ನು ನಿಲ್ಲಿಸಲು ಬ್ಯಾಂಕ್ ಶಾಖೆಗೆ ಸಲ್ಲಿಸುವ ವಿನಂತಿ.",
       "description_en": "Instruct the bank to stop payment on a cheque you issued.",
       "fields": [
         {

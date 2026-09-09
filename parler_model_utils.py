@@ -40,9 +40,12 @@ def max_new_tokens_for_text(text: str) -> int:
 
     Fixed max_new_tokens=1800 makes even short replies slow on GPU.
     """
-    cap = int(os.environ.get("BANK_PARLER_MAX_NEW_TOKENS", "1800"))
-    floor = int(os.environ.get("BANK_PARLER_MIN_NEW_TOKENS", "320"))
-    per_char = int(os.environ.get("BANK_PARLER_TOKENS_PER_CHAR", "45"))
+    # Balanced defaults reduce needless generation for kiosk-sized sentences.
+    # The prior 1800/320/45 profile remains available through environment
+    # overrides if a listening benchmark finds clipping on specific hardware.
+    cap = int(os.environ.get("BANK_PARLER_MAX_NEW_TOKENS", "1500"))
+    floor = int(os.environ.get("BANK_PARLER_MIN_NEW_TOKENS", "280"))
+    per_char = int(os.environ.get("BANK_PARLER_TOKENS_PER_CHAR", "40"))
     n = len((text or "").strip())
     if n <= 0:
         return floor
@@ -58,9 +61,21 @@ def load_parler_model(model_id: str, device: str):
     from parler_tts import ParlerTTSForConditionalGeneration
 
     dtype = resolve_parler_dtype(device)
-    model = ParlerTTSForConditionalGeneration.from_pretrained(
-        model_id,
-        torch_dtype=dtype,
-    ).to(device)
+    load_kwargs = {"torch_dtype": dtype}
+    attention = os.environ.get("BANK_PARLER_ATTN_IMPLEMENTATION", "sdpa").strip()
+    if attention:
+        load_kwargs["attn_implementation"] = attention
+    try:
+        model = ParlerTTSForConditionalGeneration.from_pretrained(
+            model_id,
+            **load_kwargs,
+        ).to(device)
+    except (TypeError, ValueError):
+        # Older Parler/Transformers builds may not expose attn_implementation.
+        load_kwargs.pop("attn_implementation", None)
+        model = ParlerTTSForConditionalGeneration.from_pretrained(
+            model_id,
+            **load_kwargs,
+        ).to(device)
     model.eval()
     return model, dtype

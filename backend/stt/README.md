@@ -56,7 +56,8 @@ data/stt_test_audio/
 
 models/
 ├── whisper-medium-ct2/            Converted baseline model (gitignored)
-└── whisper-medium-vaani-ct2/      Converted specialized model (gitignored)
+├── whisper-medium-vaani-ct2/      Converted VAANI rollback model (gitignored)
+└── whisper-kannada-medium-ct2/     Converted Vasista production model (gitignored)
 ```
 
 ---
@@ -66,13 +67,17 @@ models/
 | Key | HuggingFace ID | Purpose |
 |-----|----------------|---------|
 | `baseline` | `openai/whisper-medium` | Generic multilingual Whisper — not Kannada-tuned; benchmark lower bound |
-| `specialized` | `ARTPARK-IISc/whisper-medium-vaani-kannada` | Fine-tuned on VAANI Kannada dataset — production model |
+| `specialized` | `ARTPARK-IISc/whisper-medium-vaani-kannada` | Previous production model, retained for rollback |
+| `vasista-medium` | `vasista22/whisper-kannada-medium` | Kannada-fine-tuned production default |
+
+Set `BANK_STT_MODEL=vasista-medium` for the default model, or
+`BANK_STT_MODEL=specialized` to roll back without changing code.
 
 ---
 
 ## Model Conversion
 
-`convert_models.py` is a **one-time setup script**. It downloads both Whisper
+`convert_models.py` is a **one-time setup script**. It downloads the selected Whisper
 checkpoints from HuggingFace and converts them to CTranslate2 int8 format for
 fast offline CPU inference. After this step the `models/` directory is
 self-contained and no internet access is ever needed again.
@@ -97,6 +102,9 @@ python backend/stt/convert_models.py --model baseline
 
 # Convert only the Kannada-specialized model
 python backend/stt/convert_models.py --model specialized
+
+# Convert the default Vasista Kannada model
+python backend/stt/convert_models.py --model vasista-medium
 ```
 
 ### What the script does
@@ -299,12 +307,12 @@ before concluding the fine-tuning didn't help:
 
 ## API Reference
 
-### `transcribe(audio_path, model="specialized", beam_size=1) → str`
+### `transcribe(audio_path, model=None, beam_size=1) → str`
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `audio_path` | required | Path to `.wav` file (16 kHz mono recommended) |
-| `model` | `"specialized"` | `"baseline"` or `"specialized"` |
+| `model` | `None` | Uses `BANK_STT_MODEL`; explicit options are `"baseline"`, `"specialized"`, or `"vasista-medium"` |
 | `beam_size` | `1` | `1` = greedy/fast (≤10 s on CPU); `5` = beam search/accurate |
 
 **Returns:** Kannada text string, or `""` for silent clips.  

@@ -35,7 +35,11 @@ export function AgentMascot({ mood = "waiting", className = "" }: AgentMascotPro
   }, [mood]);
 
   return (
-    <div className={`agent-mascot agent-mascot-${mood} ${className}`} aria-hidden>
+    <div
+      className={`agent-mascot agent-mascot-${mood} ${className}`}
+      role="status"
+      aria-label={label}
+    >
       <div className="agent-mascot-glow" />
       <div className="agent-mascot-rings" aria-hidden>
         <span />
@@ -44,6 +48,7 @@ export function AgentMascot({ mood = "waiting", className = "" }: AgentMascotPro
       </div>
       <div className="agent-mascot-stage">
         <svg
+          aria-hidden
           className="agent-mascot-svg"
           viewBox="0 0 200 240"
           xmlns="http://www.w3.org/2000/svg"

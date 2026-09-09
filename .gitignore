@@ -2,6 +2,7 @@
 # Run backend/stt/convert_models.py and backend/nlu/train.py to regenerate
 models/whisper-medium-ct2/
 models/whisper-medium-vaani-ct2/
+models/whisper-kannada-medium-ct2/
 models/nlu-distilbert/
 !models/.gitkeep
 !models/nlu-distilbert/nlu_baseline_results.csv
@@ -14,6 +15,9 @@ models/nlu-distilbert/
 # ── Audio files (too large) ────────────────────────────────────────────────────
 data/stt_test_audio/*.wav
 data/tts_output/
+data/tts_cache/
+data/runtime_settings.json
+data/logs/
 data/history.db
 data/kiosk_greeting.wav
 data/greetings/

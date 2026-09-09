@@ -105,6 +105,8 @@ def run_pipeline(
     output_dir: str | None = None,
     output_name: str | None = None,
     context: DialogContext | dict[str, Any] | None = None,
+    *,
+    synthesise_audio: bool = True,
 ) -> PipelineResult:
     """
     Run the complete voice banking pipeline on a single .wav file.
@@ -157,14 +159,14 @@ def run_pipeline(
     _unload_stt = None
     try:
         from backend.stt import transcribe, unload_model as _unload_stt
-        result.kannada_text = transcribe(audio_path, model="specialized", beam_size=1)
+        result.kannada_text = transcribe(audio_path, beam_size=1)
     except Exception as exc:
         result.error = "STT failed: " + str(exc)
         result.total_time_s = round(time.perf_counter() - t_total, 2)
         return result
     finally:
         if _unload_stt is not None:
-            _maybe_unload(_unload_stt, "specialized")
+            _maybe_unload(_unload_stt)
     result.stage_times["stt"] = round(time.perf_counter() - t0, 2)
 
     if not result.kannada_text.strip():
@@ -239,7 +241,7 @@ def run_pipeline(
                         "Opening balance inquiry. I will ask for your account number next."
                     )
                     result.response_text_kn = (
-                        "ಬ್ಯಾಲೆನ್ಸ್ ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸುತ್ತೇನೆ. ಮುಂದೆ ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಕೇಳುತ್ತೇನೆ."
+                        "ಖಾತೆಯ ಶಿಲ್ಕು ಪರಿಶೀಲನೆಯನ್ನು ಪ್ರಾರಂಭಿಸುತ್ತೇನೆ."
                     )
                     acct = _extract_account_hint(result.kannada_text, result.english_text)
                     if acct:
@@ -291,7 +293,7 @@ def run_pipeline(
                     "Please say the menu number or form name again."
                 )
                 result.response_text_kn = (
-                    "ಅರ್ಜಿ ಗುರುತಿಸಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಸಂಖ್ಯೆ ಅಥವಾ ಅರ್ಜಿ ಹೆಸರು ಮತ್ತೆ ಹೇಳಿ."
+                    "ಅರ್ಜಿಯನ್ನು ಗುರುತಿಸಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಅರ್ಜಿಯ ಸಂಖ್ಯೆ ಅಥವಾ ಹೆಸರನ್ನು ಮತ್ತೆ ಹೇಳಿ."
                 )
                 result.confidence = 0.0
                 routed = True
@@ -332,9 +334,9 @@ def run_pipeline(
                         "balance, open account, loan, deposit, or withdraw."
                     )
                     kn_clarify = (
-                        "ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ತೊಂದರೆಯಾಗುತ್ತಿದೆ. "
-                        "ದಯವಿಟ್ಟು ಕೌಂಟರ್‌ಗೆ ಬನ್ನಿ ಅಥವಾ ಒಂದು ಸೇವೆಯನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ — "
-                        "ಬ್ಯಾಲೆನ್ಸ್, ಖಾತೆ, ಸಾಲ, ಠೇವಣಿ, ಅಥವಾ ಹಿಂಪಡೆಯುವಿಕೆ."
+                        "ನೀವು ಹೇಳಿದ್ದು ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ತೊಂದರೆಯಾಗುತ್ತಿದೆ. "
+                        "ದಯವಿಟ್ಟು ಸಿಬ್ಬಂದಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ ಅಥವಾ ಒಂದು ಸೇವೆಯನ್ನು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ — "
+                        "ಖಾತೆಯ ಶಿಲ್ಕು, ಖಾತೆ ತೆರೆಯುವುದು, ಸಾಲ, ಠೇವಣಿ, ಅಥವಾ ಹಣ ಹಿಂಪಡೆಯುವುದು."
                     )
                     result.intent = "clarification"
                     result.route = "informational"
@@ -364,7 +366,7 @@ def run_pipeline(
                         "Opening balance inquiry. I will ask for your account number next."
                     )
                     result.response_text_kn = (
-                        "ಬ್ಯಾಲೆನ್ಸ್ ಪರಿಶೀಲನೆ ಪ್ರಾರಂಭಿಸುತ್ತೇನೆ. ಮುಂದೆ ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಕೇಳುತ್ತೇನೆ."
+                        "ಖಾತೆಯ ಶಿಲ್ಕು ಪರಿಶೀಲನೆಯನ್ನು ಪ್ರಾರಂಭಿಸುತ್ತೇನೆ."
                     )
                     acct = _extract_account_hint(result.kannada_text, result.english_text)
                     if acct:
@@ -377,6 +379,33 @@ def run_pipeline(
         if _unload_nlu is not None:
             _maybe_unload(_unload_nlu, "finetuned")
     result.stage_times["nlu_router"] = round(time.perf_counter() - t0, 2)
+
+    # Interactive HTTP requests fetch TTS separately so semantic results reach
+    # the UI immediately and the STT worker is not held by remote synthesis.
+    if not synthesise_audio:
+        if not result.response_text_kn.strip() and result.response_text.strip():
+            t0 = time.perf_counter()
+            _unload_response_translation = None
+            try:
+                from backend.translation import (
+                    translate_en_to_kn,
+                    unload_model as _unload_response_translation,
+                )
+
+                result.response_text_kn = translate_en_to_kn(result.response_text)
+            except Exception:
+                # Routing remains successful even if response localization fails.
+                result.response_text_kn = ""
+            finally:
+                if _unload_response_translation is not None:
+                    _maybe_unload(_unload_response_translation, "en_to_kn")
+            result.stage_times["response_translation"] = round(
+                time.perf_counter() - t0,
+                2,
+            )
+        result.stage_times["tts"] = 0.0
+        result.total_time_s = round(time.perf_counter() - t_total, 2)
+        return result
 
     # ── Stage 4: TTS ──────────────────────────────────────────────────────────
     # Natural Kannada = Indic Parler. Free Whisper/NLU VRAM before Parler worker.

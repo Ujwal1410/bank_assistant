@@ -22,7 +22,12 @@ os.chdir(ROOT)
 from backend.pipeline_bridge import _extract_json_payload, stop_worker  # noqa: E402
 
 API = os.environ.get("BANK_API", "http://127.0.0.1:8000")
-WAV = os.path.abspath(os.path.join("data", "tts_output", "e2e_ask_balance.wav"))
+WAV = os.path.abspath(
+    os.environ.get(
+        "BANK_E2E_WAV",
+        os.path.join("data", "stt_test_audio", "clip_001.wav"),
+    )
+)
 
 
 def post_audio(path: str) -> dict:

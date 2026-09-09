@@ -59,9 +59,9 @@ export function LandingPage({ onStartAssist, onOpenHistory, onOpenForms, refresh
           <div className="hero-orb" />
           <div className="hero-panel">
             <p className="hero-panel-label">What this assistant does</p>
-            <p className="hero-panel-line kn">ಬ್ಯಾಂಕ್ ಬ್ಯಾಲೆನ್ಸ್ ಅನ್ನು ಪರಿಶೀಲಿಸುವುದು ಹೇಗೆ</p>
+            <p className="hero-panel-line kn">ನನ್ನ ಖಾತೆಯ ಶಿಲ್ಕು ಎಷ್ಟು?</p>
             <p className="hero-panel-line">→ Understands your intent</p>
-            <p className="hero-panel-line">→ Tells you how to check (ATM / branch) — never shows your actual balance</p>
+            <p className="hero-panel-line">→ Uses demo account data to show a simulated balance</p>
           </div>
         </div>
       </section>

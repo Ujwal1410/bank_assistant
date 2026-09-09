@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   adminLogout,
   endKioskSessionAsAdmin,
@@ -53,13 +53,13 @@ function phaseLabelKn(phase: string): string {
     case "idle":
       return "ಕಾಯುತ್ತಿದೆ";
     case "greeting":
-      return "ನಮಸ್ಕಾರ";
+      return "ಸ್ವಾಗತಿಸುತ್ತಿದೆ";
     case "conversation":
       return "ಸಂಭಾಷಣೆ";
     case "stopped":
       return "ಮುಚ್ಚಿದೆ";
     case "ended":
-      return "ಪೂರ್ಣ";
+      return "ಪೂರ್ಣಗೊಂಡಿದೆ";
     default:
       return phase;
   }
@@ -91,11 +91,11 @@ function customerLabelKn(label: string): string {
     case "Customer at counter":
       return "ಗ್ರಾಹಕರು ಕೌಂಟರ್ ಬಳಿ";
     case "Session active":
-      return "ಸೆಷನ್ ಸಕ್ರಿಯ";
+      return "ಸಂವಾದ ಸಕ್ರಿಯವಾಗಿದೆ";
     case "Waiting for customer":
       return "ಗ್ರಾಹಕರಿಗಾಗಿ ಕಾಯುತ್ತಿದೆ";
     default:
-      return "ಯಾವುದೇ ಸೆಷನ್ ಇಲ್ಲ";
+      return "ಯಾವುದೇ ಸಂವಾದ ನಡೆಯುತ್ತಿಲ್ಲ";
   }
 }
 
@@ -114,14 +114,23 @@ export function AdminPanel({ apiOnline, username, onOpenLobby, onLogout }: Admin
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const statusFailures = useRef(0);
+  const hasLoadedStatus = useRef(false);
+  const statusGraceUntil = useRef(Date.now() + 60_000);
 
   const refreshLite = useCallback(async () => {
     try {
       const s = await fetchKioskStatusLite();
       setStatus((prev) => ({ ...prev, ...s, sessions: prev?.sessions ?? [] }));
+      hasLoadedStatus.current = true;
+      statusFailures.current = 0;
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not refresh status");
+      if (!hasLoadedStatus.current && Date.now() < statusGraceUntil.current) return;
+      statusFailures.current += 1;
+      if (statusFailures.current >= 3) {
+        setError(err instanceof Error ? err.message : "Could not refresh status");
+      }
     }
   }, []);
 
@@ -129,9 +138,15 @@ export function AdminPanel({ apiOnline, username, onOpenLobby, onLogout }: Admin
     try {
       const s = await fetchKioskStatus();
       setStatus(s);
+      hasLoadedStatus.current = true;
+      statusFailures.current = 0;
       setError(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not refresh status");
+      if (!hasLoadedStatus.current && Date.now() < statusGraceUntil.current) return;
+      statusFailures.current += 1;
+      if (statusFailures.current >= 3) {
+        setError(err instanceof Error ? err.message : "Could not refresh status");
+      }
     }
   }, []);
 
@@ -237,7 +252,11 @@ export function AdminPanel({ apiOnline, username, onOpenLobby, onLogout }: Admin
             {statusLoading ? "Loading…" : running ? "Lobby open" : "Lobby closed"}
           </h2>
           <p className="adm-hero-kn kn">
-            {statusLoading ? "ಲೋಡ್ ಆಗುತ್ತಿದೆ…" : running ? "ಲಂಬಿ ತೆರೆದಿದೆ" : "ಲಂಬಿ ಮುಚ್ಚಿದೆ"}
+            {statusLoading
+              ? "ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ…"
+              : running
+                ? "ಲಾಬಿ ತೆರೆದಿದೆ"
+                : "ಲಾಬಿ ಮುಚ್ಚಿದೆ"}
           </p>
           <p className="adm-hero-hint">{statusLoading ? "Fetching lobby status…" : hint}</p>
           {running && (
@@ -348,7 +367,7 @@ export function AdminPanel({ apiOnline, username, onOpenLobby, onLogout }: Admin
                 <span className="adm-step-num">1</span>
                 <div>
                   <strong>Open lobby</strong>
-                  <span className="kn">ಲಂಬಿ ತೆರೆಯಿರಿ</span>
+                  <span className="kn">ಲಾಬಿ ತೆರೆಯಿರಿ</span>
                   <p>When your counter is ready for customers.</p>
                 </div>
               </li>
@@ -364,7 +383,7 @@ export function AdminPanel({ apiOnline, username, onOpenLobby, onLogout }: Admin
                 <span className="adm-step-num">3</span>
                 <div>
                   <strong>Assistant greets</strong>
-                  <span className="kn">ಸಹಾಯಕ ನಮಸ್ಕಾರ</span>
+                  <span className="kn">ಸಹಾಯಕ ಸ್ವಾಗತಿಸುತ್ತದೆ</span>
                   <p>Customers are welcomed in natural Kannada.</p>
                 </div>
               </li>

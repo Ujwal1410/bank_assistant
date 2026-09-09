@@ -95,6 +95,7 @@ def synthesise_kannada(
     output_path: str | None = None,
     play: bool = False,
     voice_description: str | None = None,
+    speaker: str | None = None,
 ) -> tuple[np.ndarray, int] | None:
     """
     Synthesise from Kannada text.
@@ -105,13 +106,24 @@ def synthesise_kannada(
     if not kannada_text or not kannada_text.strip():
         return None
 
-    speaker = None
-    if voice_description:
+    selected_speaker = speaker
+    if not selected_speaker and voice_description:
         v = voice_description.strip().lower()
         if "anu" in v:
-            speaker = "Anu"
+            selected_speaker = "Anu"
         elif "suresh" in v:
-            speaker = "Suresh"
+            selected_speaker = "Suresh"
+    if not selected_speaker:
+        try:
+            from api.app_settings import get_tts_speaker
+
+            selected_speaker = get_tts_speaker()
+        except Exception:
+            selected_speaker = os.environ.get("BANK_TTS_SPEAKER", "Suresh")
+    if selected_speaker:
+        selected_speaker = (
+            "Anu" if selected_speaker.strip().lower() == "anu" else "Suresh"
+        )
 
     from backend.tts.parler_bridge import parler_available, synthesise_kannada_parler
     from backend.tts.remote_bridge import remote_tts_configured, synthesise_kannada_remote
@@ -126,7 +138,10 @@ def synthesise_kannada(
     # Remote Parler on a second GPU — no local VRAM used on this machine.
     if remote_tts_configured() and engine in {"parler", "indic-parler", "auto", "remote"}:
         try:
-            audio, sr = synthesise_kannada_remote(kannada_text, speaker=speaker)
+            audio, sr = synthesise_kannada_remote(
+                kannada_text,
+                speaker=selected_speaker,
+            )
             if output_path:
                 _save_audio(audio, sr, output_path)
             if play:
@@ -140,7 +155,10 @@ def synthesise_kannada(
 
     if force_parler or parler_available():
         try:
-            audio, sr = synthesise_kannada_parler(kannada_text, speaker=speaker)
+            audio, sr = synthesise_kannada_parler(
+                kannada_text,
+                speaker=selected_speaker,
+            )
             if output_path:
                 _save_audio(audio, sr, output_path)
             if play:

@@ -142,23 +142,29 @@ export async function speakKannada(
   text: string,
   signal?: AbortSignal,
   apiOnline: boolean | null = true,
+  onAudioReady?: () => void,
+  speaker?: "Suresh" | "Anu",
 ): Promise<void> {
   if (!text.trim()) return;
 
   try {
     if (apiOnline !== false) {
       try {
-        const b64 = await fetchSpeakKannada(text, signal);
+        const b64 = await fetchSpeakKannada(text, signal, speaker);
         if (b64) {
+          onAudioReady?.();
           await playBase64Wav(b64, signal);
           return;
         }
       } catch (err) {
         if (isAbortError(err)) return;
-        // fall through to browser voice
+        // Do not silently replace the admin-selected Suresh/Anu voice with an
+        // unrelated browser voice when the API is online but TTS is slow.
+        throw err;
       }
     }
 
+    onAudioReady?.();
     await speakKannadaBrowser(text);
   } catch (err) {
     if (isAbortError(err)) return;

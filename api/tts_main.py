@@ -14,7 +14,9 @@ from __future__ import annotations
 import asyncio
 import os
 import sys
+import time
 from contextlib import asynccontextmanager
+from typing import Literal
 
 from dotenv import load_dotenv
 
@@ -28,6 +30,12 @@ os.environ.setdefault("BANK_TTS_ALLOW_MMS", "0")
 os.environ.setdefault("BANK_TTS_SPEAKER", "Suresh")
 os.environ.setdefault("BANK_PARLER_DTYPE", "fp16")
 os.environ.setdefault("BANK_PARLER_DO_SAMPLE", "1")
+os.environ.setdefault("BANK_PARLER_REQUIRE_CUDA", "1")
+os.environ.setdefault("BANK_PARLER_ATTN_IMPLEMENTATION", "sdpa")
+os.environ.setdefault("BANK_PARLER_COMPILE", "default")
+os.environ.setdefault("BANK_PARLER_MAX_NEW_TOKENS", "1500")
+os.environ.setdefault("BANK_PARLER_MIN_NEW_TOKENS", "280")
+os.environ.setdefault("BANK_PARLER_TOKENS_PER_CHAR", "40")
 os.environ.setdefault("BANK_TTS_CACHE_MAX", "512")
 # Never call remote TTS from the TTS service itself (would loop to localhost:8001).
 os.environ.pop("BANK_TTS_REMOTE_URL", None)
@@ -37,54 +45,60 @@ from pydantic import BaseModel, Field  # noqa: E402
 
 from backend.tts.parler_bridge import (  # noqa: E402
     default_speaker,
+    ensure_parler_ready,
     parler_available,
     parler_ready,
+    parler_runtime_info,
     parler_warm_error,
     stop_worker,
 )
 from backend.tts.speak_cache import get_cached_b64, kannada_to_b64  # noqa: E402
-from backend.tts.warmup import warm_parler_service  # noqa: E402
-
 _warm_stats: dict = {}
+_synth_semaphore = asyncio.Semaphore(
+    max(1, int(os.environ.get("BANK_TTS_CONCURRENCY", "1")))
+)
 
 
-def _synth_b64(text: str, speaker: str | None) -> tuple[str, bool]:
+def _synth_b64(
+    text: str,
+    speaker: str | None,
+    *,
+    bypass_cache: bool = False,
+) -> tuple[str, bool]:
     """Returns (audio_b64, cache_hit)."""
     sp = speaker or default_speaker()
-    hit = get_cached_b64(text, speaker=sp)
-    if hit:
-        return hit, True
-    prev = os.environ.get("BANK_TTS_SPEAKER")
-    os.environ["BANK_TTS_SPEAKER"] = sp
-    try:
-        b64 = kannada_to_b64(text)
-    finally:
-        if prev is None:
-            os.environ.pop("BANK_TTS_SPEAKER", None)
-        else:
-            os.environ["BANK_TTS_SPEAKER"] = prev
+    if not bypass_cache:
+        hit = get_cached_b64(text, speaker=sp)
+        if hit:
+            return hit, True
+    if bypass_cache:
+        b64 = kannada_to_b64(text, speaker=sp, bypass_cache=True)
+    else:
+        b64 = kannada_to_b64(text, speaker=sp)
     return b64, False
 
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Block server accept until Parler is loaded and lobby phrases are cached."""
+    """Load the model once; static cache generation is a deployment task."""
     global _warm_stats
     print(
-        "[tts-server] Loading Parler FP16 model + caching phrases "
+        "[tts-server] Loading Parler FP16 model "
         "(first start may take 1–2 minutes)…",
         file=sys.stderr,
         flush=True,
     )
-    _warm_stats = await asyncio.to_thread(
-        warm_parler_service,
-        extra_phrases=(
-            "ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ",
-            "ದಯವಿಟ್ಟು ಸಂಖ್ಯೆ ಅಥವಾ ಅರ್ಜಿ ಹೆಸರು ಹೇಳಿ",
-            "ನಿಮ್ಮ ಅರ್ಜಿ ಸಿದ್ಧ.",
-            "ಪ್ರಿಂಟ್ ಮಾಡಬಹುದು.",
-        ),
-    )
+    started = time.perf_counter()
+    ready = await asyncio.to_thread(ensure_parler_ready)
+    _warm_stats = {
+        "ok": ready,
+        "model_ready": ready,
+        "phrases_cached": 0,
+        "cache_warm": "deployment-managed",
+        "speaker": default_speaker(),
+        "elapsed_s": round(time.perf_counter() - started, 1),
+        "error": None if ready else parler_warm_error(),
+    }
     if _warm_stats.get("ok"):
         print(
             f"[tts-server] Ready — speaker={_warm_stats.get('speaker')} "
@@ -99,6 +113,15 @@ async def _lifespan(_app: FastAPI):
             file=sys.stderr,
             flush=True,
         )
+        if os.environ.get("BANK_PARLER_REQUIRE_CUDA", "1").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }:
+            raise RuntimeError(
+                f"Production TTS failed to become ready: {_warm_stats.get('error')}"
+            )
     yield
     stop_worker()
 
@@ -108,7 +131,11 @@ app = FastAPI(title="Kannada TTS Service (Parler)", version="1.0.0", lifespan=_l
 
 class SpeakBody(BaseModel):
     text: str = Field(..., min_length=1, max_length=2000)
-    speaker: str | None = Field(default=None, description="Suresh or Anu")
+    speaker: Literal["Suresh", "Anu"] | None = Field(
+        default=None,
+        description="Suresh or Anu",
+    )
+    bypass_cache: bool = Field(default=False, description="Benchmark only")
 
 
 def _require_key(x_bank_tts_key: str | None = Header(default=None, alias="X-Bank-Tts-Key")) -> None:
@@ -134,6 +161,7 @@ def health() -> dict:
         "ready": ready,
         "speaker": default_speaker(),
         "warmup": _warm_stats,
+        "runtime": parler_runtime_info(),
         "error": parler_warm_error(),
     }
 
@@ -155,17 +183,71 @@ async def speak_kannada(body: SpeakBody, _: None = Depends(_require_key)) -> dic
         )
 
     speaker = (body.speaker or "").strip() or None
+    started = time.perf_counter()
+    resolved_speaker = speaker or default_speaker()
+    if not body.bypass_cache:
+        cached_audio = get_cached_b64(text, speaker=resolved_speaker)
+        if cached_audio:
+            total_s = round(time.perf_counter() - started, 3)
+            return {
+                "text": text,
+                "audio_b64": cached_audio,
+                "speaker": resolved_speaker,
+                "engine": "indic-parler-tts",
+                "cached": True,
+                "timing": {
+                    "total_s": total_s,
+                    "api_queue_wait_s": 0.0,
+                    "cache_hit": True,
+                },
+            }
+    queue_timeout = max(
+        0.1,
+        float(os.environ.get("BANK_TTS_QUEUE_TIMEOUT", "5")),
+    )
     try:
-        audio_b64, cached = await asyncio.to_thread(_synth_b64, text, speaker)
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"TTS failed: {exc}") from exc
+        await asyncio.wait_for(_synth_semaphore.acquire(), timeout=queue_timeout)
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=429,
+            detail="TTS is busy; retry this request shortly",
+        ) from exc
+    queue_wait_s = time.perf_counter() - started
+    try:
+        try:
+            audio_b64, cached = await asyncio.to_thread(
+                _synth_b64,
+                text,
+                resolved_speaker,
+                bypass_cache=body.bypass_cache,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"TTS failed: {exc}") from exc
+    finally:
+        _synth_semaphore.release()
 
     if not audio_b64:
         raise HTTPException(status_code=500, detail="TTS returned empty audio")
+    total_s = round(time.perf_counter() - started, 3)
+    runtime = parler_runtime_info()
+    timing = {
+        "total_s": total_s,
+        "api_queue_wait_s": round(queue_wait_s, 3),
+        "cache_hit": cached,
+    }
+    if not cached and runtime.get("last_metrics"):
+        timing.update(runtime["last_metrics"])
+    print(
+        f"[tts-server] speaker={resolved_speaker} chars={len(text)} "
+        f"cache_hit={int(cached)} total_s={total_s}",
+        file=sys.stderr,
+        flush=True,
+    )
     return {
         "text": text,
         "audio_b64": audio_b64,
-        "speaker": speaker or default_speaker(),
+        "speaker": resolved_speaker,
         "engine": "indic-parler-tts",
         "cached": cached,
+        "timing": timing,
     }

@@ -9,7 +9,7 @@ Set-Location $Root
 Write-Host ""
 Write-Host "=== Single-PC local demo ===" -ForegroundColor Cyan
 Write-Host "Opening 3 terminals in order:"
-Write-Host "  1. TTS server  :8001  (loads Parler — wait for Ready log)"
+Write-Host "  1. TTS server  :8001  (loads Parler - wait for Ready log)"
 Write-Host "  2. Main API    :8000  (waits for TTS, then starts)"
 Write-Host "  3. Frontend    :5173 / :5174"
 Write-Host ""

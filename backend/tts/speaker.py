@@ -86,9 +86,25 @@ def _normalise_digits(text: str) -> str:
     (e.g. "3 ಪಾಯಿಂಟ್ 5"). VitsModel produces artefacts on these mixed-script
     tokens. Replacing with Kannada words produces smoother output.
     """
-    for digit, word in _DIGIT_MAP.items():
-        text = text.replace(digit, word)
-    return text
+    def digit_words(raw: str) -> str:
+        return " ".join(_DIGIT_MAP[ch] for ch in raw if ch in _DIGIT_MAP)
+
+    # Currency must be read as a number, not as unrelated individual digits.
+    from backend.forms.summary_kn import amount_speak_kn
+
+    text = re.sub(
+        r"(?<!\d)(\d[\d,]*(?:\.\d{1,2})?)\s*ರೂಪಾಯಿ",
+        lambda match: amount_speak_kn(match.group(1)),
+        text,
+    )
+    text = re.sub(
+        r"(?<!\d)(\d+)\.(\d+)(?!\d)",
+        lambda match: (
+            f"{digit_words(match.group(1))} ಪಾಯಿಂಟ್ {digit_words(match.group(2))}"
+        ),
+        text,
+    )
+    return re.sub(r"\d+", lambda match: digit_words(match.group(0)), text)
 
 
 class KannadaSpeaker:

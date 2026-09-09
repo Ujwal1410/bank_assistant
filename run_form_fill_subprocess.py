@@ -18,7 +18,13 @@ os.environ["HF_HUB_OFFLINE"] = "1"
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from backend.forms.extract import extract_field_value
-from backend.forms.stt_tuning import NAME_FIELD_IDS, form_fill_beam_size
+from backend.forms.stt_tuning import (
+    NAME_FIELD_IDS,
+    english_digit_retry_hints,
+    form_fill_beam_size,
+    form_fill_stt_hints,
+    plausible_digit_capture,
+)
 from backend.stt import transcribe, unload_model as unload_stt
 from backend.translation import translate_kn_to_en, unload_model as unload_trans
 
@@ -30,28 +36,71 @@ kannada = ""
 english = ""
 value = ""
 error = None
+validation_error = None
+numeric_retry_used = False
 
 beam = form_fill_beam_size(field_type, field_id)
+prompt, hotwords = form_fill_stt_hints(field_type, field_id)
 
 try:
-    kannada = transcribe(wav_path, model="specialized", beam_size=beam) or ""
+    kannada = transcribe(
+        wav_path,
+        beam_size=beam,
+        initial_prompt=prompt,
+        hotwords=hotwords,
+    ) or ""
     if not kannada.strip():
         error = "STT returned empty (silent audio)"
     else:
+        normalized_type = (field_type or "").lower()
+        if normalized_type == "digits":
+            from backend.forms.kannada_digits import extract_digits_from_kannada
+
+            primary_digits = extract_digits_from_kannada(kannada)
+            if plausible_digit_capture(primary_digits, field_id):
+                value = primary_digits
+            else:
+                numeric_retry_used = True
+                retry_prompt, retry_hotwords = english_digit_retry_hints(field_id)
+                retry_text = transcribe(
+                    wav_path,
+                    beam_size=beam,
+                    initial_prompt=retry_prompt,
+                    hotwords=retry_hotwords,
+                    language="en",
+                ) or ""
+                retry_digits = extract_digits_from_kannada(retry_text)
+                if plausible_digit_capture(retry_digits, field_id) or len(
+                    retry_digits
+                ) > len(primary_digits):
+                    value = retry_digits
+                    english = retry_text
+
+        if not value and (
+            normalized_type == "date" or "date" in (field_id or "").lower()
+        ):
+            from backend.forms.date_kn import extract_date_from_kannada
+
+            value = extract_date_from_kannada(kannada)
         try:
-            unload_stt("specialized")
+            unload_stt()
         except Exception:
             pass
-        english = translate_kn_to_en(kannada) or ""
-        try:
-            unload_trans("kn_to_en")
-        except Exception:
-            pass
-        if not english.strip():
-            value = kannada.strip()
-            error = "Translation returned empty; using Kannada text"
-        else:
-            value = extract_field_value(english, field_type=field_type, field_id=field_id)
+        if not value:
+            english = translate_kn_to_en(kannada) or ""
+            try:
+                unload_trans("kn_to_en")
+            except Exception:
+                pass
+            if not english.strip():
+                value = kannada.strip()
+                error = "Translation returned empty; using Kannada text"
+            else:
+                value = extract_field_value(
+                    english,
+                    field_type=field_type,
+                    field_id=field_id,
+                )
 
         if not (value or "").strip() and (field_id or "").lower() in NAME_FIELD_IDS:
             value = extract_field_value(english or kannada, field_type=field_type, field_id=field_id)
@@ -66,10 +115,17 @@ try:
                 value = kn_digits
             elif kn_digits and not value:
                 value = kn_digits
+        from backend.forms.validation import validate_captured_value
+
+        validation_error = validate_captured_value(
+            value,
+            field_type=field_type,
+            field_id=field_id,
+        )
 except Exception as exc:
     error = str(exc)
     try:
-        unload_stt("specialized")
+        unload_stt()
     except Exception:
         pass
     try:
@@ -84,6 +140,9 @@ print(
             "english_text": english,
             "value": value,
             "error": error,
+            "validation_error": validation_error,
+            "digit_count": len("".join(ch for ch in value if ch.isdigit())),
+            "numeric_retry_used": numeric_retry_used,
         }
     )
 )

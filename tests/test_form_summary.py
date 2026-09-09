@@ -13,7 +13,7 @@ from backend.forms.summary_kn import (
 def _withdrawal_form() -> dict:
     return {
         "id": "cash_withdrawal",
-        "title_kn": "ನಗದು ಹಿಂಪಡೆಯುವ ಸ್ಲಿಪ್",
+        "title_kn": "ನಗದು ಹಿಂಪಡೆಯುವ ಚೀಟಿ",
         "fields": [
             {
                 "id": "full_name",
@@ -58,6 +58,12 @@ def test_digits_to_kannada_words():
 def test_amount_speak_kn():
     assert "ಸಾವಿರ" in amount_speak_kn("5000")
     assert "ರೂಪಾಯಿ" in amount_speak_kn("5000")
+    assert amount_speak_kn("11") == "ಹನ್ನೊಂದು ರೂಪಾಯಿ"
+    assert amount_speak_kn("18") == "ಹದಿನೆಂಟು ರೂಪಾಯಿ"
+    assert amount_speak_kn("25") == "ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ"
+    assert amount_speak_kn("80") == "ಎಂಬತ್ತು ರೂಪಾಯಿ"
+    assert amount_speak_kn("125") == "ನೂರ ಇಪ್ಪತ್ತೈದು ರೂಪಾಯಿ"
+    assert amount_speak_kn("125000") == "ಒಂದು ಲಕ್ಷ ಇಪ್ಪತ್ತೈದು ಸಾವಿರ ರೂಪಾಯಿ"
 
 
 def test_build_form_summary_kn():
@@ -71,8 +77,8 @@ def test_build_form_summary_kn():
         },
     )
     assert payload["form_id"] == "cash_withdrawal"
-    assert "ನಿಮ್ಮ ಅರ್ಜಿ ಸಿದ್ಧ" in payload["summary_kn"]
-    assert "ಪ್ರಿಂಟ್ ಮಾಡಬಹುದು" in payload["summary_kn"]
+    assert "ನಿಮ್ಮ ಅರ್ಜಿಯ ಸಾರಾಂಶ" in payload["summary_kn"]
+    assert "ವಿವರಗಳು ಸರಿಯಾಗಿವೆಯೇ" in payload["summary_kn"]
     assert payload["confirm_prompt_kn"]
     assert len(payload["lines"]) == 3
     acct_line = next(l for l in payload["lines"] if l["field_id"] == "account_number")

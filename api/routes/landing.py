@@ -15,13 +15,13 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(_
 BANK_INFO_PATH = os.path.join(PROJECT_ROOT, "data", "bank_info.json")
 
 INTENTS = [
-    {"id": "check_balance", "label": "How to check balance", "example": "ಬ್ಯಾಂಕ್ ಬ್ಯಾಲೆನ್ಸ್ ಅನ್ನು ಪರಿಶೀಲಿಸುವುದು ಹೇಗೆ"},
-    {"id": "interest_rate_query", "label": "Interest rate info", "example": "ಸೇವಿಂಗ್ಸ್ ಬಡ್ಡಿ ದರ ಎಷ್ಟು?"},
+    {"id": "check_balance", "label": "Check account balance", "example": "ನನ್ನ ಖಾತೆಯ ಶಿಲ್ಕು ಎಷ್ಟು?"},
+    {"id": "interest_rate_query", "label": "Interest rate info", "example": "ಉಳಿತಾಯ ಖಾತೆಯ ಬಡ್ಡಿ ದರ ಎಷ್ಟು?"},
     {"id": "open_account", "label": "How to open an account", "example": "ಹೊಸ ಖಾತೆ ತೆರೆಯಬೇಕು"},
-    {"id": "apply_loan", "label": "How to apply for a loan", "example": "ಸಾಲಕ್ಕೆ ಅರ್ಜಿ ಹೇಗೆ?"},
+    {"id": "apply_loan", "label": "How to apply for a loan", "example": "ಸಾಲಕ್ಕೆ ಅರ್ಜಿ ಸಲ್ಲಿಸುವುದು ಹೇಗೆ?"},
     {"id": "deposit_money", "label": "How to deposit money", "example": "ಹಣ ಜಮಾ ಮಾಡಬೇಕು"},
     {"id": "withdraw_money", "label": "How to withdraw money", "example": "ಹಣ ಹಿಂಪಡೆಯಬೇಕು"},
-    {"id": "account_info_query", "label": "Account procedure help", "example": "ಮೊಬೈಲ್ ನಂಬರ್ ಬದಲಾಯಿಸುವುದು ಹೇಗೆ?"},
+    {"id": "account_info_query", "label": "Account procedure help", "example": "ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ಬದಲಾಯಿಸುವುದು ಹೇಗೆ?"},
 ]
 
 PIPELINE = [
@@ -65,13 +65,6 @@ def landing_data() -> dict:
         "intents": INTENTS,
         "interest_rates": rate_rows,
         "pipeline": PIPELINE,
-        "recent": [
-            {
-                "id": item["id"],
-                "intent": item["intent"],
-                "kannada_text": item["kannada_text"],
-                "created_at": item["created_at"],
-            }
-            for item in history_items[:5]
-        ],
+        # Public landing responses must not expose customer transcripts.
+        "recent": [],
     }

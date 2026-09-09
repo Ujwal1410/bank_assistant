@@ -72,22 +72,33 @@ MENU_TRIGGERS = (
 _MENU_WORD_TRIGGERS = ("form", "application")
 
 _ORDINALS = {
-    "1": 1, "one": 1, "first": 1, "ondu": 1, "onduvadu": 1, "first one": 1,
-    "2": 2, "two": 2, "second": 2, "eradu": 2, "second one": 2,
-    "3": 3, "three": 3, "third": 3, "mooru": 3,
-    "4": 4, "four": 4, "fourth": 4, "nalku": 4,
-    "5": 5, "five": 5, "fifth": 5, "aidu": 5,
-    "6": 6, "six": 6, "sixth": 6,
-    "7": 7, "seven": 7, "seventh": 7,
-    "8": 8, "eight": 8, "eighth": 8,
-    "9": 9, "nine": 9, "ninth": 9,
-    "10": 10, "ten": 10, "tenth": 10,
-    "11": 11, "eleven": 11, "eleventh": 11,
+    "1": 1, "೧": 1, "one": 1, "first": 1, "ondu": 1, "onduvadu": 1,
+    "first one": 1, "ಒಂದು": 1, "ಮೊದಲ": 1, "ಮೊದಲನೆಯದು": 1,
+    "2": 2, "೨": 2, "two": 2, "second": 2, "eradu": 2, "second one": 2,
+    "ಎರಡು": 2, "ಎರಡನೆಯದು": 2,
+    "3": 3, "೩": 3, "three": 3, "third": 3, "mooru": 3,
+    "ಮೂರು": 3, "ಮೂರನೆಯದು": 3,
+    "4": 4, "೪": 4, "four": 4, "fourth": 4, "nalku": 4,
+    "ನಾಲ್ಕು": 4, "ನಾಲ್ಕನೆಯದು": 4,
+    "5": 5, "೫": 5, "five": 5, "fifth": 5, "aidu": 5,
+    "ಐದು": 5, "ಐದನೆಯದು": 5,
+    "6": 6, "೬": 6, "six": 6, "sixth": 6, "ಆರು": 6, "ಆರನೆಯದು": 6,
+    "7": 7, "೭": 7, "seven": 7, "seventh": 7, "ಏಳು": 7, "ಏಳನೆಯದು": 7,
+    "8": 8, "೮": 8, "eight": 8, "eighth": 8, "ಎಂಟು": 8, "ಎಂಟನೆಯದು": 8,
+    "9": 9, "೯": 9, "nine": 9, "ninth": 9, "ಒಂಬತ್ತು": 9, "ಒಂಬತ್ತನೆಯದು": 9,
+    "10": 10, "೧೦": 10, "ten": 10, "tenth": 10, "ಹತ್ತು": 10, "ಹತ್ತನೆಯದು": 10,
+    "11": 11, "೧೧": 11, "eleven": 11, "eleventh": 11,
+    "ಹನ್ನೊಂದು": 11, "ಹನ್ನೊಂದನೆಯದು": 11,
 }
 
 
 def _norm(text: str) -> str:
     return re.sub(r"\s+", " ", (text or "").lower()).strip()
+
+
+def _speech_tokens(text: str) -> list[str]:
+    """Keep Kannada combining marks together when tokenising menu choices."""
+    return re.findall(r"[\u0c80-\u0cff]+|[a-z0-9]+", text.lower())
 
 
 def _menu_forms() -> list[dict[str, Any]]:
@@ -122,7 +133,7 @@ def match_form_in_menu(kannada: str, english: str, form_ids: list[str]) -> str |
     if not combined:
         return None
 
-    for token in re.findall(r"\b\w+\b", combined):
+    for token in _speech_tokens(combined):
         if token in _ORDINALS:
             idx = _ORDINALS[token] - 1
             if 0 <= idx < len(form_ids):
@@ -172,7 +183,7 @@ def match_form_from_speech(kannada: str, english: str) -> str | None:
     forms = _menu_forms()
 
     # Number pick: "number 3", "option 2", "3", "third form"
-    for token in re.findall(r"\b\w+\b", combined):
+    for token in _speech_tokens(combined):
         if token in _ORDINALS:
             idx = _ORDINALS[token] - 1
             if 0 <= idx < len(forms):
@@ -212,8 +223,8 @@ def build_form_menu_payload() -> dict[str, Any]:
     """Build spoken menu + structured list for frontend."""
     forms = _menu_forms()
     lines_kn: list[str] = [
-        "ನಾವು ಈ ಬ್ಯಾಂಕ್ ಅರ್ಜಿಗಳನ್ನು ಕನ್ನಡದಲ್ಲಿ ತುಂಬಬಹುದು.",
-        "ದಯವಿಟ್ಟು ಸಂಖ್ಯೆ ಅಥವಾ ಅರ್ಜಿ ಹೆಸರು ಹೇಳಿ.",
+        "ಈ ಬ್ಯಾಂಕ್ ಅರ್ಜಿ ನಮೂನೆಗಳನ್ನು ಕನ್ನಡದಲ್ಲಿ ಭರ್ತಿ ಮಾಡಲು ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+        "ದಯವಿಟ್ಟು ನಿಮಗೆ ಬೇಕಾದ ಅರ್ಜಿಯ ಸಂಖ್ಯೆ ಅಥವಾ ಹೆಸರನ್ನು ಹೇಳಿ.",
     ]
     items: list[dict[str, Any]] = []
     for i, form in enumerate(forms, start=1):
@@ -244,7 +255,7 @@ def build_form_menu_payload() -> dict[str, Any]:
 def opening_line_for_form(form_id: str) -> tuple[str, str]:
     form = forms_catalog.get_form(form_id)
     if not form:
-        return ("ಅರ್ಜಿ ಪ್ರಾರಂಭಿಸುತ್ತೇವೆ.", "Starting the form.")
-    kn = f"{form['title_kn']} ಅರ್ಜಿ ಪ್ರಾರಂಭಿಸುತ್ತೇವೆ. ಪ್ರತಿ ಪ್ರಶ್ನೆಗೆ ಕನ್ನಡದಲ್ಲಿ ಉತ್ತರಿಸಿ."
+        return ("ಅರ್ಜಿಯನ್ನು ಪ್ರಾರಂಭಿಸುತ್ತಿದ್ದೇನೆ.", "Starting the form.")
+    kn = f"ಈಗ {form['title_kn']} ಪ್ರಾರಂಭವಾಗುತ್ತದೆ. ಪ್ರತಿ ಪ್ರಶ್ನೆಗೆ ಕನ್ನಡದಲ್ಲಿ ಉತ್ತರಿಸಿ."
     en = f"Starting {form['title_en']}. Please answer each question in Kannada."
     return kn, en

@@ -404,7 +404,7 @@ export function FormsPanel({
                   Confirm · ದೃಢೀಕರಿಸಿ
                 </button>
                 <button type="button" className="secondary-btn" onClick={handleReRecord}>
-                  Re-record · ಮರುಹೇಳಿ
+                  ಮತ್ತೆ ಧ್ವನಿಮುದ್ರಿಸಿ · Re-record
                 </button>
               </div>
             </div>

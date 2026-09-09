@@ -39,17 +39,18 @@ def remote_tts_configured() -> bool:
 def _timeout_s() -> float | None:
     """
     Remote speak timeout in seconds.
-    BANK_TTS_REMOTE_TIMEOUT=0 (or none/inf) → wait until response (no limit).
+    Use ``none``/``inf`` only for an intentional unlimited development wait.
+    Zero and invalid values fall back to the production-safe 90 second limit.
     """
-    raw = os.environ.get("BANK_TTS_REMOTE_TIMEOUT", "600").strip().lower()
-    if raw in {"0", "none", "inf", "infinite", "wait"}:
+    raw = os.environ.get("BANK_TTS_REMOTE_TIMEOUT", "90").strip().lower()
+    if raw in {"none", "inf", "infinite", "wait"}:
         return None
     try:
         val = float(raw)
     except ValueError:
-        return 600.0
+        return 90.0
     if val <= 0:
-        return None
+        return 90.0
     return val
 
 
@@ -90,13 +91,32 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None) -> dict
     last_err: Exception | None = None
     for attempt in range(retries):
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        started = time.perf_counter()
         try:
             if attempt == 0:
                 print(f"[remote-tts] {method} {url}", file=sys.stderr, flush=True)
             with _opener_get().open(req, timeout=_timeout_s()) as resp:
                 raw = resp.read().decode("utf-8")
+            elapsed_ms = round((time.perf_counter() - started) * 1000)
+            print(
+                f"[remote-tts] response attempt={attempt + 1} request_ms={elapsed_ms}",
+                file=sys.stderr,
+                flush=True,
+            )
             try:
-                return json.loads(raw)
+                payload = json.loads(raw)
+                timing = payload.get("timing") if isinstance(payload, dict) else None
+                if isinstance(timing, dict):
+                    print(
+                        "[remote-tts] "
+                        f"cache_hit={int(bool(timing.get('cache_hit')))} "
+                        f"queue_s={timing.get('queue_wait_s', 0)} "
+                        f"generation_s={timing.get('generation_s', 0)} "
+                        f"server_total_s={timing.get('total_s', 0)}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                return payload
             except json.JSONDecodeError as exc:
                 raise RuntimeError(f"Remote TTS bad JSON: {raw[:200]}") from exc
         except urllib.error.HTTPError as exc:

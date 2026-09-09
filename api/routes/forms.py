@@ -9,11 +9,11 @@ import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 
 from api.audio import audio_bytes_to_wav, safe_unlink
-from api import forms_catalog
+from api import admin_auth, forms_catalog
 from backend.db import store
 from backend.forms.form_menu import build_form_menu_payload, match_form_from_speech, match_form_in_menu
 from backend.pipeline_bridge import (
@@ -52,6 +52,46 @@ class FormSummaryBody(BaseModel):
     values: dict[str, str] = Field(default_factory=dict)
 
 
+def _validate_submission(form: dict, values: dict[str, str]) -> dict[str, str]:
+    fields = {
+        str(field.get("id") or ""): field
+        for field in form.get("fields") or []
+        if field.get("id")
+    }
+    unknown = sorted(set(values) - set(fields))
+    if unknown:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown form fields: {', '.join(unknown)}",
+        )
+
+    cleaned: dict[str, str] = {}
+    for field_id, field in fields.items():
+        value = str(values.get(field_id) or "").strip()
+        if len(value) > 500:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Field '{field_id}' is too long",
+            )
+        if field.get("required") and not value:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Required field missing: {field_id}",
+            )
+        if value:
+            from backend.forms.validation import validate_captured_value
+
+            validation_error = validate_captured_value(
+                value,
+                field_type=str(field.get("type") or "text"),
+                field_id=field_id,
+            )
+            if validation_error:
+                raise HTTPException(status_code=422, detail=validation_error)
+        cleaned[field_id] = value
+    return cleaned
+
+
 @router.get("/forms/menu")
 def form_menu() -> dict:
     """Numbered Kannada form menu for voice selection."""
@@ -59,7 +99,10 @@ def form_menu() -> dict:
 
 
 @router.get("/forms/submissions")
-def list_submissions(limit: int = 50) -> dict:
+def list_submissions(
+    limit: int = 50,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
     """Recent form submissions (MongoDB or local jsonl)."""
     items = store.list_form_submissions(limit=min(max(limit, 1), 200))
     return {"items": items, "count": len(items)}
@@ -71,11 +114,12 @@ def submit_form(body: FormSubmitBody) -> dict:
     form = forms_catalog.get_form(body.form_id)
     if form is None:
         raise HTTPException(status_code=404, detail=f"Unknown form: {body.form_id}")
+    values = _validate_submission(form, body.values)
     saved = store.save_form_submission(
         body.form_id,
-        body.title_kn or form.get("title_kn") or "",
-        body.title_en or form.get("title_en") or "",
-        body.values,
+        form.get("title_kn") or "",
+        form.get("title_en") or "",
+        values,
         kiosk_session_id=body.kiosk_session_id,
     )
     return {"ok": True, "submission": saved}
@@ -145,21 +189,24 @@ def form_prompt_audio(form_id: str) -> dict:
     texts["_form_ready"] = FORM_READY_KN
 
     try:
+        from api.app_settings import get_tts_speaker
         from backend.tts.speak_cache import kannada_to_b64
 
+        speaker = get_tts_speaker()
         audio: dict[str, str] = {}
         errors: dict[str, str] = {}
 
         def _synth_one(key: str, text: str) -> tuple[str, str, str | None]:
             try:
-                b64 = kannada_to_b64(text)
+                b64 = kannada_to_b64(text, speaker=speaker, persist=True)
                 if b64:
                     return key, b64, None
                 return key, "", "empty audio"
             except Exception as exc:
                 return key, "", str(exc)
 
-        with ThreadPoolExecutor(max_workers=4) as pool:
+        workers = max(1, min(4, int(os.environ.get("BANK_TTS_WARM_WORKERS", "2"))))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
             futures = [
                 pool.submit(_synth_one, key, text)
                 for key, text in texts.items()
@@ -286,20 +333,28 @@ async def fill_field(
     english = (result.get("english_text") or "").strip()
     value = (result.get("value") or "").strip()
     err = result.get("error")
+    validation_error = result.get("validation_error")
+    stage_times = result.get("stage_times") or {}
+    print(
+        f"[forms] fill field={field_id or '-'} type={field_type or 'text'} "
+        f"stages={stage_times} valid={not bool(validation_error)} "
+        f"digits={int(result.get('digit_count') or 0)} "
+        f"numeric_retry={bool(result.get('numeric_retry_used'))}"
+    )
 
-    # Confirm step: require affirmative speech or non-empty STT
+    # Confirm step: only an explicit affirmative response confirms the value.
     if (field_id or "").lower() == "confirm":
         combined = f"{kannada} {english} {value}".lower()
         affirm = any(
             w in combined
             for w in ("yes", "ok", "okay", "correct", "right", "confirm", "ಸರಿ", "ಹೌದು", "confirm")
         )
-        if not affirm and not (kannada.strip() or value.strip()):
+        if not affirm:
             return {
                 "kannada_text": kannada,
                 "english_text": english,
                 "value": "",
-                "error": "Please say yes to confirm or no to repeat",
+                "error": 'ದಯವಿಟ್ಟು "ಹೌದು" ಅಥವಾ "ಇಲ್ಲ" ಎಂದು ಹೇಳಿ.',
             }
         return {
             "kannada_text": kannada,
@@ -325,4 +380,6 @@ async def fill_field(
         "english_text": english,
         "value": value or english or kannada,
         "error": err,
+        "validation_error": validation_error,
+        "stage_times": stage_times,
     }

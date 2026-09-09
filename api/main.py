@@ -63,79 +63,21 @@ app.include_router(admin.router, prefix="/api")
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
-    import threading
-    from backend.pipeline_bridge import worker_enabled, _start_locked, _lock
+    from backend.pipeline_bridge import warm_pipeline, worker_enabled
 
-    def _warm_pipeline() -> None:
-        if not worker_enabled():
-            return
-        try:
-            with _lock:
-                _start_locked()
-        except Exception as exc:
-            import sys
-            print(f"[startup] pipeline worker pre-warm failed: {exc}", file=sys.stderr)
-
-    def _warm_phrases() -> None:
-        """Pre-cache common Kannada TTS clips after pipeline / remote TTS is ready."""
+    warm_on_start = os.environ.get("BANK_PIPELINE_WARM_ON_START", "1").strip().lower()
+    if not worker_enabled() or warm_on_start in {"0", "false", "off", "no"}:
+        return
+    try:
+        result = warm_pipeline()
+        print(
+            f"[startup] pipeline ready model={result.get('model')} "
+            f"stages={result.get('stage_times')}"
+        )
+    except Exception as exc:
         import sys
-        import time
 
-        from backend.tts.remote_bridge import remote_tts_configured
-
-        if remote_tts_configured():
-            from backend.tts.warmup import warm_via_remote_phrases
-
-            result = warm_via_remote_phrases(
-                extra_phrases=("ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ", "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ"),
-            )
-            if not result.get("ok"):
-                print(f"[startup] remote TTS pre-warm failed: {result.get('error')}", file=sys.stderr)
-            try:
-                from backend.greet_warm import warm_first_greeting_variants
-
-                warm_first_greeting_variants()
-            except Exception as exc:
-                print(f"[startup] greeting WAV warm failed: {exc}", file=sys.stderr)
-            return
-
-        from backend.pipeline_bridge import worker_enabled, _lock, _ready, _start_locked
-
-        # Wait for pipeline worker before loading local TTS on GPU (avoids VRAM race).
-        if worker_enabled():
-            for _ in range(90):
-                with _lock:
-                    if _ready:
-                        break
-                time.sleep(1)
-            else:
-                try:
-                    with _lock:
-                        _start_locked()
-                    time.sleep(5)
-                except Exception as exc:
-                    print(f"[startup] pipeline not ready for TTS prewarm: {exc}", file=sys.stderr)
-        else:
-            time.sleep(2)
-
-        try:
-            from backend.tts.warmup import warm_parler_service
-
-            result = warm_parler_service(
-                extra_phrases=("ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ",),
-            )
-            if result.get("ok"):
-                print(
-                    f"[startup] local Parler ready; cached {result.get('phrases_cached')} phrase(s)",
-                    file=sys.stderr,
-                )
-            else:
-                print(f"[startup] local Parler pre-warm failed: {result.get('error')}", file=sys.stderr)
-        except Exception as exc:
-            print(f"[startup] TTS phrase pre-warm failed: {exc}", file=sys.stderr)
-
-    threading.Thread(target=_warm_pipeline, daemon=True, name="pipeline-warmup").start()
-    threading.Thread(target=_warm_phrases, daemon=True, name="tts-phrase-warmup").start()
+        print(f"[startup] pipeline pre-warm failed: {exc}", file=sys.stderr)
 
 
 @app.on_event("shutdown")

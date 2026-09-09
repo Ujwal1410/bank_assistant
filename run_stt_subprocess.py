@@ -20,7 +20,7 @@ from backend.stt import transcribe
 
 wav_path = sys.argv[1]
 try:
-    text = transcribe(wav_path, model="specialized", beam_size=5)
+    text = transcribe(wav_path, beam_size=5)
     print(json.dumps({"text": text or "", "error": None}))
 except Exception as exc:
     print(json.dumps({"text": "", "error": str(exc)}))

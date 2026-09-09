@@ -50,7 +50,7 @@ $Port = if ($env:BANK_TTS_PORT) { $env:BANK_TTS_PORT } else { "8001" }
 Write-Host "==> Kannada TTS server (Parler FP16) on 0.0.0.0:$Port" -ForegroundColor Green
 Write-Host "    Parler venv: $ParlerPy"
 Write-Host "    API host:    $HostPy"
-Write-Host "    First start loads model (~1-2 min) — wait for Ready"
+Write-Host "    First start loads model (~1-2 min) - wait for Ready"
 Write-Host "    Health: http://127.0.0.1:$Port/api/health"
 Write-Host "    Public: https://tts.sarastralabs.com/api/health (after cloudflared)"
 Write-Host ""

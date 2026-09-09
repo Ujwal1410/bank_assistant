@@ -82,8 +82,13 @@ interface PipelineProgressProps {
   mode?: "assist" | "form";
 }
 
-const ASSIST_STEPS = ["ಕೇಳಿದೆ", "ಅರ್ಥಮಾಡಿಕೊಂಡೆ", "ಉತ್ತರ", "ಹೇಳುತ್ತೇನೆ"];
-const FORM_STEPS = ["ಕೇಳಿದೆ", "ಗುರುತಿಸಿದೆ", "✓"];
+const ASSIST_STEPS = [
+  "ಕೇಳುತ್ತಿದ್ದೇನೆ",
+  "ಅರ್ಥಮಾಡಿಕೊಳ್ಳುತ್ತಿದ್ದೇನೆ",
+  "ಉತ್ತರ ಸಿದ್ಧಪಡಿಸುತ್ತಿದ್ದೇನೆ",
+  "ಉತ್ತರ ನೀಡುತ್ತಿದ್ದೇನೆ",
+];
+const FORM_STEPS = ["ಕೇಳುತ್ತಿದ್ದೇನೆ", "ಗುರುತಿಸುತ್ತಿದ್ದೇನೆ", "ಪೂರ್ಣ"];
 
 export function PipelineProgress({ active, mode = "assist" }: PipelineProgressProps) {
   if (!active) return null;
@@ -121,7 +126,7 @@ export function BalanceResultCard({ result }: BalanceResultCardProps) {
 
   return (
     <section className="balance-result-card panel" aria-live="polite">
-      <h3 className="balance-result-title">ಬ್ಯಾಲೆನ್ಸ್ · Balance</h3>
+      <h3 className="balance-result-title">ಖಾತೆಯ ಶಿಲ್ಕು · Balance</h3>
       {result.found ? (
         <>
           {result.holder_name_kn && (
@@ -155,7 +160,7 @@ export function FormSummaryPanel({ lines, activeIndex = -1 }: FormSummaryPanelPr
   if (!lines.length) return null;
   return (
     <div className="live-summary-panel">
-      <h3 className="live-summary-title">ಅರ್ಜಿ ಸಾರಾಂಶ</h3>
+      <h3 className="live-summary-title">ಅರ್ಜಿಯ ಸಾರಾಂಶ</h3>
       <ul className="live-summary-list">
         {lines.map((line, i) => (
           <li
