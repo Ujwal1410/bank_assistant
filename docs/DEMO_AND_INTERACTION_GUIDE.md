@@ -71,12 +71,14 @@ The **Agent** screen (`https://localhost:5173`) will show “Waiting for custome
 |------|----------------|-------------|
 | 1 | Counter is open | Admin starts kiosk |
 | 2 | Stand in camera frame | Presence detected |
-| 3 | Time-based Kannada greeting | Listen — bot greets you |
-| 4 | Conversation starts | Bot shows “Listening — speak in Kannada” |
+| 3 | Time-based Kannada greeting | Text shows first, then voice — **wait** |
+| 4 | Preparing → green **Listening** | Speak only when Listening is green |
 | 5 | You ask your need | Speak clearly in Kannada |
 | 6 | Bot answers or opens a form | Follow voice prompts |
-| 7 | Confirm each field | Say **ಸರಿ** (yes) or **ಮತ್ತೆ ಹೇಳಿ** (say again) |
+| 7 | Confirm each field | Say **ಹೌದು** / **ಸರಿ** or **ಮತ್ತೆ ಹೇಳಿ** |
 | 8 | End session | Say **ಮುಗಿಸು** or tap **End** |
+
+On-screen help: **ಹೇಗೆ ಮಾತನಾಡುವುದು · How to speak** (same tips as [WHAT_TO_SPEAK.md](./WHAT_TO_SPEAK.md)).
 
 **Tips**
 
@@ -121,31 +123,34 @@ Best demo path (~1–2 minutes):
    ನನ್ನ ಖಾತೆಯ ಬಾಕಿ ಎಷ್ಟಿದೆ
    ```
 
-4. Bot asks for account number. Customer says (digits, clearly):
+4. Bot asks for account number. Customer says **all 10 digits** clearly:
 
    ```
-   1234567890
+   one two three four five six seven eight nine zero
    ```
 
-   Or speak digit-by-digit in Kannada/English.
+   Or Kannada digits one-by-one (include final **ಸೊನ್ನೆ** / zero).
 
 5. Bot confirms. Customer says:
 
    ```
-   ಸರಿ
+   ಹೌದು
    ```
 
 6. Bot speaks balance in Kannada, e.g. ₹**45,230.50** for account `1234567890`.
 
-### Demo accounts (only these work)
+### Demo accounts (only these work — 10 digits)
 
 | Account number | Name | Balance (₹) | Type |
 |----------------|------|-------------|------|
 | `1234567890` | Ramesh Kumar | 45,230.50 | Savings |
 | `9876543210` | Anita Rao | 12,500.00 | Savings |
 | `1111222233` | Suresh Gowda | 89,340.75 | Current |
+| `2222333344` | Lakshmi Devi | 67,890.25 | Savings |
+| `5555666677` | Prakash Shetty | 15,250.00 | Savings |
+| `8888999900` | Meena Patil | 2,40,075.50 | Current |
 
-Any other number → “account not found” message in Kannada.
+Any other number → “account not found” message in Kannada. Full speak guide: [WHAT_TO_SPEAK.md](./WHAT_TO_SPEAK.md).
 
 ---
 

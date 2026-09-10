@@ -4,6 +4,8 @@ A full AI/ML pipeline that takes spoken Kannada audio and returns a Kannada voic
 
 **Complete project documentation:** [docs/END_TO_END_PROJECT_DOCUMENTATION.md](docs/END_TO_END_PROJECT_DOCUMENTATION.md) — problem statement, objectives, architecture, full technology stack, AI models, APIs, voice and form flows, setup, deployment, testing, security, limitations, and future scope.
 
+**What to speak (demo / juniors):** [docs/WHAT_TO_SPEAK.md](docs/WHAT_TO_SPEAK.md) — Kannada/English phrases, UI wait vs listen, 6 demo accounts, form questions, scripts.
+
 ---
 
 ## Pipeline Overview
