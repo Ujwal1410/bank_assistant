@@ -12,13 +12,24 @@ def _tts_main():
     return importlib.import_module("api.tts_main")
 
 
-def test_lifespan_only_warms_model(monkeypatch) -> None:
+def test_lifespan_warms_model_and_phrases(monkeypatch) -> None:
     tts_main = _tts_main()
     calls: list[str] = []
     monkeypatch.setattr(
         tts_main,
+        "warm_parler_service",
+        lambda: calls.append("warm")
+        or {
+            "ok": True,
+            "ready": True,
+            "phrases_cached": 4,
+            "speaker": "Suresh",
+        },
+    )
+    monkeypatch.setattr(
+        tts_main,
         "ensure_parler_ready",
-        lambda: calls.append("model") or True,
+        lambda: True,
     )
     monkeypatch.setattr(
         tts_main,
@@ -29,10 +40,11 @@ def test_lifespan_only_warms_model(monkeypatch) -> None:
     async def run() -> None:
         async with tts_main._lifespan(tts_main.app):
             assert tts_main._warm_stats["model_ready"] is True
-            assert tts_main._warm_stats["phrases_cached"] == 0
+            assert tts_main._warm_stats["phrases_cached"] == 4
+            assert tts_main._warm_stats["cache_warm"] == "startup-prewarm"
 
     anyio.run(run)
-    assert calls == ["model", "stop"]
+    assert calls == ["warm", "stop"]
 
 
 def test_requested_speaker_is_passed_explicitly(monkeypatch) -> None:

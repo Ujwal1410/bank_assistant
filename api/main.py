@@ -13,6 +13,10 @@ import os
 from dotenv import load_dotenv as _load_dotenv
 _load_dotenv(dotenv_path=os.path.join(os.path.dirname(os.path.dirname(__file__)), ".env"), override=True)
 
+from backend.quiet_torch import install_quiet_triton_stderr
+
+install_quiet_triton_stderr()
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -63,23 +67,69 @@ app.include_router(admin.router, prefix="/api")
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
-    from backend.pipeline_bridge import warm_pipeline, worker_enabled
-
-    warm_on_start = os.environ.get("BANK_PIPELINE_WARM_ON_START", "1").strip().lower()
-    if not worker_enabled() or warm_on_start in {"0", "false", "off", "no"}:
-        return
     try:
-        result = warm_pipeline()
-        print(
-            f"[startup] pipeline ready model={result.get('model')} "
-            f"stages={result.get('stage_times')}"
-        )
+        from backend.db.customers import init_customer_db, seed_from_demo, store_mode
+
+        mode = init_customer_db()
+        if mode == "sqlite":
+            seeded = seed_from_demo(force=False)
+            print(f"[startup] customer store=sqlite seed={seeded}", flush=True)
+        else:
+            print(f"[startup] customer store={mode}", flush=True)
     except Exception as exc:
         import sys
 
-        print(f"[startup] pipeline pre-warm failed: {exc}", file=sys.stderr)
+        print(f"[startup] customer store init skipped: {exc}", file=sys.stderr)
 
+    from backend.pipeline_bridge import warm_pipeline, worker_enabled
 
+    warm_on_start = os.environ.get("BANK_PIPELINE_WARM_ON_START", "1").strip().lower()
+    if worker_enabled() and warm_on_start not in {"0", "false", "off", "no"}:
+        try:
+            result = warm_pipeline()
+            print(
+                f"[startup] pipeline ready model={result.get('model')} "
+                f"stages={result.get('stage_times')}"
+            )
+        except Exception as exc:
+            import sys
+
+            print(f"[startup] pipeline pre-warm failed: {exc}", file=sys.stderr)
+
+    # Keep remote TTS "hot" from the kiosk side: pull common phrases into local cache
+    # so first customer replies do not wait on a cold remote synthesis.
+    try:
+        import threading
+
+        from backend.tts.remote_bridge import remote_tts_configured
+
+        if remote_tts_configured():
+
+            def _warm_remote_phrases() -> None:
+                try:
+                    from backend.tts.warmup import warm_via_remote_phrases
+
+                    warm = warm_via_remote_phrases()
+                    print(f"[startup] remote TTS phrase cache: {warm}", flush=True)
+                except Exception as warm_exc:
+                    import sys
+
+                    print(
+                        f"[startup] remote TTS phrase warm skipped: {warm_exc}",
+                        file=sys.stderr,
+                        flush=True,
+                    )
+
+            threading.Thread(
+                target=_warm_remote_phrases,
+                name="tts-phrase-warm",
+                daemon=True,
+            ).start()
+            print("[startup] remote TTS phrase warm started in background", flush=True)
+    except Exception as exc:
+        import sys
+
+        print(f"[startup] remote TTS warm hook failed: {exc}", file=sys.stderr)
 @app.on_event("shutdown")
 def _shutdown() -> None:
     try:

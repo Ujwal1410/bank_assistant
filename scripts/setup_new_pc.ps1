@@ -1,5 +1,5 @@
-# ============================================================================
-# setup_new_pc.ps1 — Full first-time setup (venv + libs + models + frontend)
+﻿# ============================================================================
+# setup_new_pc.ps1 - Full first-time setup (venv + libs + models + frontend)
 #
 # From project root:
 #   powershell -ExecutionPolicy Bypass -File scripts\setup_new_pc.ps1
@@ -29,7 +29,7 @@ Set-Location $ProjectRoot
 function Write-Step($n, $total, $msg) {
     Write-Host ""
     Write-Host "============================================================" -ForegroundColor Cyan
-    Write-Host "  STEP $n/$total — $msg" -ForegroundColor Cyan
+    Write-Host "  STEP $n/$total - $msg" -ForegroundColor Cyan
     Write-Host "============================================================" -ForegroundColor Cyan
 }
 
@@ -50,7 +50,11 @@ function Write-Info($msg) {
 function Test-HfTokenConfigured {
     param([string]$PythonExe)
     try {
-        $out = & $PythonExe -c "from huggingface_hub import get_token; t=get_token(); print('yes' if t else 'no')" 2>&1
+        $probe = @'
+from huggingface_hub import get_token
+print('yes' if get_token() else 'no')
+'@
+        $out = & $PythonExe -c $probe 2>&1
         return ("$out" -match "yes")
     } catch {
         return $false
@@ -103,9 +107,9 @@ function Invoke-HuggingFaceWizard {
     )
 
     Write-Host ""
-    Write-Host "  ┌─────────────────────────────────────────────────────────┐" -ForegroundColor Yellow
-    Write-Host "  │  HuggingFace — one-time setup (needs a free account)   │" -ForegroundColor Yellow
-    Write-Host "  └─────────────────────────────────────────────────────────┘" -ForegroundColor Yellow
+    Write-Host "  +---------------------------------------------------------+" -ForegroundColor Yellow
+    Write-Host "  |  HuggingFace - one-time setup (needs a free account)   |" -ForegroundColor Yellow
+    Write-Host "  +---------------------------------------------------------+" -ForegroundColor Yellow
     Write-Host ""
 
     if (Test-HfTokenConfigured -PythonExe $PythonExe) {
@@ -113,7 +117,7 @@ function Invoke-HuggingFaceWizard {
             Ok "HuggingFace already logged in with model access"
             return $true
         }
-        Write-Host "  Token found but model access failed — need license + valid token" -ForegroundColor Yellow
+        Write-Host "  Token found but model access failed - need license + valid token" -ForegroundColor Yellow
     }
 
     Write-Host "  Do these in your browser (we can open links for you):" -ForegroundColor White
@@ -121,15 +125,15 @@ function Invoke-HuggingFaceWizard {
     Write-Host "    [A] Create account / log in" -ForegroundColor Cyan
     Write-Host "        https://huggingface.co/login"
     Write-Host ""
-    Write-Host "    [B] Accept license — page 1 (click 'Agree and access repository')" -ForegroundColor Cyan
+    Write-Host "    [B] Accept license - page 1 (click 'Agree and access repository')" -ForegroundColor Cyan
     Write-Host "        https://huggingface.co/ai4bharat/indictrans2-indic-en-dist-200M"
     Write-Host ""
-    Write-Host "    [C] Accept license — page 2 (click 'Agree and access repository')" -ForegroundColor Cyan
+    Write-Host "    [C] Accept license - page 2 (click 'Agree and access repository')" -ForegroundColor Cyan
     Write-Host "        https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M"
     Write-Host ""
-    Write-Host "    [D] Create a Read token (copy it — starts with hf_)" -ForegroundColor Cyan
+    Write-Host "    [D] Create a Read token (copy it - starts with hf_)" -ForegroundColor Cyan
     Write-Host "        https://huggingface.co/settings/tokens"
-    Write-Host "        → New token → Name: voice-banking → Type: Read"
+    Write-Host "        -> New token -> Name: voice-banking -> Type: Read"
     Write-Host ""
 
     $open = Read-Host "  Open links [A][B][C][D] in browser now? (Y/N)"
@@ -141,15 +145,15 @@ function Invoke-HuggingFaceWizard {
         Start-Process "https://huggingface.co/ai4bharat/indictrans2-en-indic-dist-200M"
         Start-Sleep -Seconds 1
         Start-Process "https://huggingface.co/settings/tokens"
-        Write-Info "Browser tabs opened — complete steps A→D, then return here."
+        Write-Info "Browser tabs opened - complete steps A->D, then return here."
     }
 
     Write-Host ""
-    $lic = Read-Host "  Finished steps A–D and accepted BOTH licenses? (Y/N)"
+    $lic = Read-Host "  Finished steps A-D and accepted BOTH licenses? (Y/N)"
     if ($lic -notmatch "^[Yy]") {
         Write-Host ""
         Write-Host "  Cannot download models without HuggingFace access." -ForegroundColor Yellow
-        Write-Host "  Complete steps A–D, then run setup again (or setup.bat --skip-models)." -ForegroundColor Yellow
+        Write-Host "  Complete steps A-D, then run setup again (or setup.bat --skip-models)." -ForegroundColor Yellow
         return $false
     }
 
@@ -172,20 +176,20 @@ function Invoke-HuggingFaceWizard {
         }
 
         if (-not ($token -match "^hf_")) {
-            Write-Host "  Token should start with hf_ — please check and try again." -ForegroundColor Yellow
+            Write-Host "  Token should start with hf_ - please check and try again." -ForegroundColor Yellow
             $token = ""
             continue
         }
 
         Write-Host "  Saving token and verifying access..."
         if (-not (Save-HfToken -PythonExe $PythonExe -Token $token)) {
-            Write-Host "  Login failed — token invalid?" -ForegroundColor Yellow
+            Write-Host "  Login failed - token invalid?" -ForegroundColor Yellow
             $token = ""
             continue
         }
 
         if (Test-HfGatedAccess -PythonExe $PythonExe) {
-            Ok "HuggingFace token saved — all required models accessible"
+            Ok "HuggingFace token saved - all required models accessible"
             return $true
         }
 
@@ -196,21 +200,21 @@ function Invoke-HuggingFaceWizard {
         $token = ""
     }
 
-    Fail "HuggingFace setup failed after $maxTries attempts. Complete licenses A–D and re-run setup.bat"
+    Fail "HuggingFace setup failed after $maxTries attempts. Complete licenses A-D and re-run setup.bat"
 }
 
 $TotalSteps = if ($SkipModels) { 7 } else { 9 }
 if ($SkipFrontend) { $TotalSteps -= 1 }
 
 Write-Host ""
-Write-Host "Kannada Voice Banking — automated setup" -ForegroundColor Yellow
+Write-Host "Kannada Voice Banking - automated setup" -ForegroundColor Yellow
 Write-Host "Project: $ProjectRoot"
 if ($Fresh) { Write-Host "Mode:    FRESH (recreate .venv)" -ForegroundColor Yellow }
 if ($SkipModels) { Write-Host "Mode:    SKIP MODEL DOWNLOADS" -ForegroundColor Yellow }
 Write-Host ""
 
 # --------------------------------------------------------------------------
-# STEP 1 — Python 3.12
+# STEP 1 - Python 3.12
 # --------------------------------------------------------------------------
 Write-Step 1 $TotalSteps "Checking Python 3.12"
 
@@ -253,7 +257,7 @@ $verText = if ($PyArgs.Count) { & $py @PyArgs --version 2>&1 } else { & $py --ve
 Ok $verText
 
 # --------------------------------------------------------------------------
-# STEP 2 — Node.js
+# STEP 2 - Node.js
 # --------------------------------------------------------------------------
 Write-Step 2 $TotalSteps "Checking Node.js / npm"
 
@@ -277,7 +281,7 @@ if (-not $SkipFrontend) {
 }
 
 # --------------------------------------------------------------------------
-# STEP 3 — Virtual environment
+# STEP 3 - Virtual environment
 # --------------------------------------------------------------------------
 Write-Step 3 $TotalSteps "Python virtual environment (.venv)"
 
@@ -301,14 +305,14 @@ if (-not (Test-Path $venvPython)) {
     }
     Ok "Created .venv"
 } else {
-    Ok ".venv exists — $($(& $venvPython --version 2>&1))"
+    Ok ".venv exists - $($(& $venvPython --version 2>&1))"
 }
 
 function VPy { & $venvPython @args }
 function VPip { & $venvPython -m pip @args }
 
 # --------------------------------------------------------------------------
-# STEP 4 — .env file
+# STEP 4 - .env file
 # --------------------------------------------------------------------------
 Write-Step 4 $TotalSteps "Environment file (.env)"
 
@@ -337,9 +341,9 @@ BANK_PIPELINE_WORKER=1
 }
 
 # --------------------------------------------------------------------------
-# STEP 5 — Python packages
+# STEP 5 - Python packages
 # --------------------------------------------------------------------------
-Write-Step 5 $TotalSteps "Installing Python packages (5–15 min)"
+Write-Step 5 $TotalSteps "Installing Python packages (5-15 min)"
 
 Write-Host "  Upgrading pip..."
 VPip install --upgrade pip wheel
@@ -377,7 +381,7 @@ if ($LASTEXITCODE -ne 0) { Fail "Package import check failed" }
 Ok "All Python dependencies installed"
 
 # --------------------------------------------------------------------------
-# STEP 6 — HuggingFace (if downloading models)
+# STEP 6 - HuggingFace (if downloading models)
 # --------------------------------------------------------------------------
 if (-not $SkipModels) {
     Write-Step 6 $TotalSteps "HuggingFace token + model download"
@@ -392,7 +396,7 @@ if (-not $SkipModels) {
         $env:PYTHONPATH = $ProjectRoot
 
         Write-Host ""
-        Write-Host "  Downloading ML models (20–40 min first time, stay online)..." -ForegroundColor White
+        Write-Host "  Downloading ML models (20-40 min first time, stay online)..." -ForegroundColor White
 
         # STT
         $sttBin = Join-Path $ProjectRoot "models\whisper-kannada-medium-ct2\model.bin"
@@ -406,11 +410,11 @@ if (-not $SkipModels) {
         }
 
         # Translation
-        Write-Host "  [2/4] Translation kn → en..."
+        Write-Host "  [2/4] Translation kn -> en..."
         VPy -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; m='ai4bharat/indictrans2-indic-en-dist-200M'; AutoTokenizer.from_pretrained(m, trust_remote_code=True); AutoModelForSeq2SeqLM.from_pretrained(m, trust_remote_code=True); print('OK')"
         if ($LASTEXITCODE -ne 0) { Fail "IndicTrans2 kn->en failed" }
 
-        Write-Host "  [3/4] Translation en → kn..."
+        Write-Host "  [3/4] Translation en -> kn..."
         VPy -c "from transformers import AutoModelForSeq2SeqLM, AutoTokenizer; m='ai4bharat/indictrans2-en-indic-dist-200M'; AutoTokenizer.from_pretrained(m, trust_remote_code=True); AutoModelForSeq2SeqLM.from_pretrained(m, trust_remote_code=True); print('OK')"
         if ($LASTEXITCODE -ne 0) { Fail "IndicTrans2 en->kn failed" }
         Ok "Translation models cached"
@@ -420,7 +424,7 @@ if (-not $SkipModels) {
         if (Test-Path $nluCfg) {
             Ok "NLU model already present"
         } else {
-            Write-Host "  [4/4] NLU training (~1–3 min)..."
+            Write-Host "  [4/4] NLU training (~1-3 min)..."
             $env:PYTHONIOENCODING = "utf-8"
             VPy backend\nlu\train.py
             if (-not (Test-Path $nluCfg)) { Fail "NLU training failed" }
@@ -436,7 +440,7 @@ if (-not $SkipModels) {
         Write-Host "  [+] Greeting audio cache (MMS, variant 0 per slot)..."
         VPy scripts\warm_greetings.py --first-only
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "  WARN: greeting cache failed — run: .\.venv\Scripts\python.exe scripts\warm_greetings.py --first-only" -ForegroundColor Yellow
+            Write-Host "  WARN: greeting cache failed - run: .\.venv\Scripts\python.exe scripts\warm_greetings.py --first-only" -ForegroundColor Yellow
         } else {
             Ok "Greeting audio cached"
         }
@@ -444,7 +448,7 @@ if (-not $SkipModels) {
 }
 
 # --------------------------------------------------------------------------
-# STEP 7 — Frontend
+# STEP 7 - Frontend
 # --------------------------------------------------------------------------
 $stepNum = if ($SkipModels) { 6 } else { 7 }
 if (-not $SkipFrontend) {
@@ -462,7 +466,7 @@ if (-not $SkipFrontend) {
 }
 
 # --------------------------------------------------------------------------
-# STEP 8 — Verify
+# STEP 8 - Verify
 # --------------------------------------------------------------------------
 $stepNum = if ($SkipModels) { if ($SkipFrontend) { 6 } else { 7 } } else { if ($SkipFrontend) { 7 } else { 8 } }
 Write-Step $stepNum $TotalSteps "Verification"
@@ -470,7 +474,7 @@ Write-Step $stepNum $TotalSteps "Verification"
 VPy scripts\deployment_check.py
 $checkCode = $LASTEXITCODE
 if ($checkCode -ne 0) {
-    Write-Host "  Some checks failed (API may not be running yet — that's OK)" -ForegroundColor Yellow
+    Write-Host "  Some checks failed (API may not be running yet - that's OK)" -ForegroundColor Yellow
 } else {
     Ok "Deployment check passed"
 }
@@ -481,7 +485,7 @@ if ($checkCode -ne 0) {
 Write-Step $TotalSteps $TotalSteps "Setup complete"
 
 Write-Host ""
-Write-Host "SUCCESS — environment ready." -ForegroundColor Green
+Write-Host "SUCCESS - environment ready." -ForegroundColor Green
 Write-Host ""
 Write-Host "HOW TO RUN (3 terminals):" -ForegroundColor Yellow
 Write-Host ""
@@ -502,5 +506,5 @@ Write-Host "  Admin login: admin / bank@123"
 Write-Host ""
 Write-Host "  Full guide: docs\DEMO_AND_INTERACTION_GUIDE.md"
 Write-Host ""
-Write-Host "Tip: No need to activate .venv — always use .\.venv\Scripts\python.exe"
+Write-Host "Tip: No need to activate .venv - always use .\.venv\Scripts\python.exe"
 Write-Host ""

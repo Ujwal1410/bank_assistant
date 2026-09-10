@@ -19,6 +19,8 @@ data/tts_cache/
 data/runtime_settings.json
 data/logs/
 data/history.db
+data/customer_banking.db
+data/form_submissions.jsonl
 data/kiosk_greeting.wav
 data/greetings/
 data/history_audio/

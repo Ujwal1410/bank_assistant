@@ -20,7 +20,8 @@ MOBILE_RETRY_KN = (
     "ದಯವಿಟ್ಟು ಹತ್ತು ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
 )
 ACCOUNT_RETRY_KN = (
-    "ದಯವಿಟ್ಟು ೮ ರಿಂದ ೧೮ ಅಂಕೆಗಳ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
+    "ದಯವಿಟ್ಟು ಹತ್ತು ಅಂಕೆಗಳ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ. "
+    "ಕೊನೆಯ ಸೊನ್ನೆಯನ್ನು ಮರೆಯಬೇಡಿ."
 )
 CHEQUE_LEAVES_RETRY_KN = "ದಯವಿಟ್ಟು ಹತ್ತು, ಇಪ್ಪತ್ತೈದು ಅಥವಾ ಐವತ್ತು ಎಂದು ಹೇಳಿ."
 DIGITS_RETRY_KN = (
@@ -62,8 +63,17 @@ def validate_captured_value(
     digits = re.sub(r"\D", "", text)
     if normalized_id in _MOBILE_FIELDS and len(digits) != 10:
         return MOBILE_RETRY_KN
-    if normalized_id in _ACCOUNT_FIELDS and not 8 <= len(digits) <= 18:
-        return ACCOUNT_RETRY_KN
+    if normalized_id in _ACCOUNT_FIELDS:
+        from backend.forms.stt_tuning import expected_account_length
+
+        expected = expected_account_length()
+        if len(digits) != expected:
+            if expected == 10:
+                return ACCOUNT_RETRY_KN
+            return (
+                f"ದಯವಿಟ್ಟು {expected} ಅಂಕೆಗಳ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು "
+                "ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
+            )
     if normalized_id == "number_of_leaves" and digits not in {"10", "25", "50"}:
         return CHEQUE_LEAVES_RETRY_KN
     if not digits:

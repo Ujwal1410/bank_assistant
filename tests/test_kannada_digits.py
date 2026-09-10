@@ -37,11 +37,16 @@ def test_mobile_and_account_validation() -> None:
     )
     assert (
         validate_captured_value(
-            "12345678",
+            "1234567890",
             field_type="digits",
             field_id="account_number",
         )
         is None
+    )
+    assert validate_captured_value(
+        "12345678",
+        field_type="digits",
+        field_id="account_number",
     )
     assert validate_captured_value(
         "1234",
@@ -99,3 +104,5 @@ def test_date_validation_rejects_garbage_and_impossible_dates() -> None:
 def test_mobile_capture_requires_all_ten_digits() -> None:
     assert not plausible_digit_capture("11", "mobile_number")
     assert plausible_digit_capture("9741447767", "mobile_number")
+    assert not plausible_digit_capture("123456789", "account_number")
+    assert plausible_digit_capture("1234567890", "account_number")

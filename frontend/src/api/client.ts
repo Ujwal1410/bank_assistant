@@ -851,3 +851,107 @@ export async function fetchAdminMe(): Promise<{ username: string; role: string }
   }
   return res.json();
 }
+
+export interface AdminCustomerRow {
+  customer_id: string | null;
+  holder_name: string;
+  holder_name_kn: string;
+  mobile?: string | null;
+  customer_status: string;
+  account_number: string;
+  account_type: string;
+  account_status: string;
+  balance_inr: number;
+  balance_updated_at?: string | null;
+  source: string;
+  loans: Array<{
+    id: string;
+    loan_type: string;
+    principal_inr: number;
+    outstanding_inr: number;
+    status: string;
+  }>;
+}
+
+export interface AdminBalanceAuditRow {
+  id: number;
+  account_number: string;
+  customer_id?: string | null;
+  found: number;
+  source: string;
+  kiosk_session_id?: string;
+  created_at: string;
+}
+
+export async function fetchAdminCustomers(): Promise<{
+  store: string;
+  customers: AdminCustomerRow[];
+  balance_audit: AdminBalanceAuditRow[];
+}> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/customers`, {
+    headers: adminAuthHeaders(),
+    timeoutMs: 15000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load customers"));
+  return res.json();
+}
+
+export interface ConversationFlowIntent {
+  intent: string;
+  route: string;
+  form_id?: string | null;
+  form_title_en?: string;
+  form_title_kn?: string;
+  required_entities: string[];
+  example_phrases: string[];
+  fields: Array<{
+    id: string;
+    label_kn: string;
+    label_en: string;
+    prompt_kn: string;
+    type: string;
+    required: boolean;
+  }>;
+  next_step: string;
+}
+
+export interface ConversationFlowData {
+  phases: Array<{ id: string; title: string; detail: string }>;
+  intents: ConversationFlowIntent[];
+  voice_commands: Record<string, string[]>;
+  form_menu: Array<{ index: number; id: string; title_kn: string; title_en: string }>;
+  intent_map: Record<string, string>;
+  notes: string[];
+}
+
+export async function fetchAdminConversationFlow(): Promise<ConversationFlowData> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/conversation-flow`, {
+    headers: adminAuthHeaders(),
+    timeoutMs: 15000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load conversation flow"));
+  return res.json();
+}
+
+export async function fetchAdminHistory(limit = 50): Promise<HistoryItem[]> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/history?limit=${limit}`, {
+    headers: adminAuthHeaders(),
+    timeoutMs: 15000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load speech history"));
+  const data = await res.json();
+  return data.items ?? [];
+}
+
+export async function fetchAdminHistoryItem(id: number | string): Promise<HistoryItem> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/history/${id}`, {
+    headers: adminAuthHeaders(),
+    timeoutMs: 20000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Failed to load history item"));
+  return res.json();
+}

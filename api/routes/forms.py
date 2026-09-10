@@ -339,6 +339,7 @@ async def fill_field(
         f"[forms] fill field={field_id or '-'} type={field_type or 'text'} "
         f"stages={stage_times} valid={not bool(validation_error)} "
         f"digits={int(result.get('digit_count') or 0)} "
+        f"value={value!r} kn={kannada[:80]!r} "
         f"numeric_retry={bool(result.get('numeric_retry_used'))}"
     )
 

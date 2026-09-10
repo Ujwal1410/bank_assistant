@@ -3,18 +3,42 @@
     "holder_name": "Ramesh Kumar",
     "holder_name_kn": "ರಾಮೇಶ್ ಕುಮಾರ್",
     "balance_inr": 45230.50,
-    "account_type": "Savings"
+    "account_type": "Savings",
+    "mobile": "9876501234"
   },
   "9876543210": {
     "holder_name": "Anita Rao",
     "holder_name_kn": "ಅನಿತಾ ರಾವ್",
     "balance_inr": 12500.00,
-    "account_type": "Savings"
+    "account_type": "Savings",
+    "mobile": "9876502345"
   },
   "1111222233": {
     "holder_name": "Suresh Gowda",
     "holder_name_kn": "ಸುರೇಶ್ ಗೌಡ",
     "balance_inr": 89340.75,
-    "account_type": "Current"
+    "account_type": "Current",
+    "mobile": "9876503456"
+  },
+  "2222333344": {
+    "holder_name": "Lakshmi Devi",
+    "holder_name_kn": "ಲಕ್ಷ್ಮಿ ದೇವಿ",
+    "balance_inr": 67890.25,
+    "account_type": "Savings",
+    "mobile": "9876504567"
+  },
+  "5555666677": {
+    "holder_name": "Prakash Shetty",
+    "holder_name_kn": "ಪ್ರಕಾಶ್ ಶೆಟ್ಟಿ",
+    "balance_inr": 15250.00,
+    "account_type": "Savings",
+    "mobile": "9876505678"
+  },
+  "8888999900": {
+    "holder_name": "Meena Patil",
+    "holder_name_kn": "ಮೀನಾ ಪಾಟೀಲ್",
+    "balance_inr": 240075.50,
+    "account_type": "Current",
+    "mobile": "9876506789"
   }
 }
