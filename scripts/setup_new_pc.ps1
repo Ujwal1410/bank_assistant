@@ -351,9 +351,12 @@ VPip install --upgrade pip wheel
 Write-Host "  Installing build deps (Cython, numpy)..."
 VPip install Cython "numpy>=2.1,<3" setuptools
 
+Write-Host "  Pinning transformers<5 before IndicTransToolkit (avoids v5 API break)..."
+VPip install "transformers>=4.51.0,<5" "huggingface-hub>=0.23,<2.0"
+
 Write-Host "  Installing IndicTransToolkit..."
 try {
-    VPip install IndicTransToolkit --no-build-isolation
+    VPip install IndicTransToolkit --no-build-isolation --constraint (Join-Path $ProjectRoot "scripts\constraints.txt")
 } catch {
     Fail @"
 IndicTransToolkit failed to build.
