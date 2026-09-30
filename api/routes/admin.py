@@ -90,3 +90,52 @@ def admin_me(admin: dict = Depends(admin_auth.require_admin)) -> dict:
 def admin_logout(authorization: str | None = Header(default=None)) -> dict:
     admin_auth.logout(authorization)
     return {"ok": True}
+
+
+@router.get("/admin/customers")
+def admin_customers(
+    limit: int = 100,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
+    from backend.db.customers import list_balance_audit, list_customers, store_mode
+
+    _ = _admin
+    return {
+        "store": store_mode(),
+        "customers": list_customers(limit=limit),
+        "balance_audit": list_balance_audit(limit=40),
+    }
+
+
+@router.get("/admin/conversation-flow")
+def admin_conversation_flow(_admin: dict = Depends(admin_auth.require_admin)) -> dict:
+    from backend.admin_flow import build_conversation_flow
+
+    _ = _admin
+    return build_conversation_flow()
+
+
+@router.get("/admin/history")
+def admin_history(
+    limit: int = 50,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
+    from backend.db import store
+
+    _ = _admin
+    items = store.list_queries(limit=max(1, min(limit, 200)))
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/admin/history/{item_id}")
+def admin_history_item(
+    item_id: str,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
+    from backend.db import store
+
+    _ = _admin
+    item = store.get_query(item_id, include_audio=True)
+    if not item:
+        raise HTTPException(status_code=404, detail="History item not found")
+    return item

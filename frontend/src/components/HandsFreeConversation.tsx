@@ -25,6 +25,7 @@ import {
   PipelineProgress,
   type BalanceResultView,
 } from "./LiveContextPanel";
+import { SpeakGuideCard } from "./SpeakGuideCard";
 import { useVadRecorder, type VadListenOptions } from "../hooks/useVadRecorder";
 import { isAbortError, userFacingFetchError } from "../utils/abortError";
 import { playBase64Wav, speakKannada, unlockAudio } from "../utils/playAudio";
@@ -101,14 +102,14 @@ function statusLabel(turn: HandsFreeTurn, mode: Mode): string {
   switch (turn) {
     case "listening":
       return mode === "form"
-        ? "ಕೇಳುತ್ತಿದ್ದೇನೆ… · Listening for your answer"
-        : "ಕೇಳುತ್ತಿದ್ದೇನೆ… · Listening — speak in Kannada";
+        ? "ಕೇಳುತ್ತಿದ್ದೇನೆ — ಈಗ ಹೇಳಿ · Listening — speak now"
+        : "ಕೇಳುತ್ತಿದ್ದೇನೆ — ಈಗ ಹೇಳಿ · Listening — speak in Kannada now";
     case "thinking":
-      return "ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ… · Processing";
+      return "ಯೋಚಿಸುತ್ತಿದ್ದೇನೆ… · Processing your speech";
     case "preparing":
-      return "ಧ್ವನಿಯನ್ನು ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ… · Preparing voice";
+      return "ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ… · Preparing — please wait, do not speak yet";
     case "speaking":
-      return "ಉತ್ತರ ನೀಡುತ್ತಿದ್ದೇನೆ… · Speaking";
+      return "ಉತ್ತರ ನೀಡುತ್ತಿದ್ದೇನೆ… · Agent speaking — please listen";
     case "form_prompt":
       return "ಮುಂದಿನ ಪ್ರಶ್ನೆಯನ್ನು ಕೇಳುತ್ತಿದ್ದೇನೆ… · Asking next field";
     case "form_confirm":
@@ -118,10 +119,17 @@ function statusLabel(turn: HandsFreeTurn, mode: Mode): string {
     case "form_preview":
       return "ಅರ್ಜಿ ಸಿದ್ಧ · Form ready to print";
     default:
-      return mode === "form_select"
-        ? "ಅರ್ಜಿಯನ್ನು ಆಯ್ಕೆ ಮಾಡಿ · Pick a form"
-        : "ಸಿದ್ಧ";
+      return "ಸಿದ್ಧ · Ready";
   }
+}
+
+/** Let React paint subtitle / status before starting TTS or mic work. */
+function waitForUiPaint(): Promise<void> {
+  return new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 const NAME_FIELD_IDS = new Set([
@@ -250,6 +258,8 @@ export function HandsFreeConversation({
 
       await unlockAudio();
       playAbortRef.current = new AbortController();
+      setTurn("preparing");
+      setHint("ಮೈಕ್ರೊಫೋನ್ ಅನುಮತಿ / ಸಿದ್ಧತೆ… · Getting microphone ready");
       const micOk = await warmupMicRef.current();
       if (!micOk || !still()) {
         setError("ಮೈಕ್ರೊಫೋನ್ ಬಳಸಲು ಅನುಮತಿ ನೀಡಿ · Please allow microphone access");
@@ -308,15 +318,21 @@ export function HandsFreeConversation({
       try {
         if (cachedB64) {
           setTurn("speaking");
+          await waitForUiPaint();
           await playBase64Wav(cachedB64, ac.signal);
           return;
         }
         setTurn("preparing");
+        setHint("ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ… · Preparing voice — please wait");
+        await waitForUiPaint();
         await speakKannada(
           text,
           ac.signal,
           apiOnlineRef.current,
-          () => setTurn("speaking"),
+          () => {
+            setTurn("speaking");
+            setHint("ಕೇಳಿರಿ… · Agent is speaking");
+          },
           speaker,
         );
       } catch (err) {
@@ -329,8 +345,9 @@ export function HandsFreeConversation({
       playAbortRef.current?.abort();
       const ac = new AbortController();
       playAbortRef.current = ac;
-      setTurn("speaking");
       if (subtitleText) setSubtitle(subtitleText);
+      setTurn("speaking");
+      await waitForUiPaint();
       try {
         await playBase64Wav(audioB64, ac.signal);
       } catch (err) {
@@ -344,8 +361,34 @@ export function HandsFreeConversation({
       cachedB64?: string,
       speaker?: "Suresh" | "Anu",
     ) => {
+      // Show text on UI first, then speak — never speak before the subtitle paints.
       setSubtitle(text);
+      await waitForUiPaint();
       await playKannada(text, cachedB64, speaker);
+    };
+
+    const listenForSpeech = async (opts: VadListenOptions = {}) => {
+      setTurn("preparing");
+      setHint((prev) =>
+        prev && !/Mic warming|ಮೈಕ್ರೊಫೋನ್ ಸಿದ್ಧ|Getting microphone/i.test(prev)
+          ? `${prev} · Mic warming — wait for green Listening`
+          : "ಮೈಕ್ರೊಫೋನ್ ಸಿದ್ಧ… · Mic warming up — wait, then speak when green",
+      );
+      await waitForUiPaint();
+      return listenOnceRef.current({
+        ...opts,
+        onMicReady: () => {
+          setTurn("listening");
+          setHint((prev) => {
+            const cleaned = (prev || "")
+              .replace(/\s*·\s*Mic warming — wait for green Listening/gi, "")
+              .replace(/ಮೈಕ್ರೊಫೋನ್ ಸಿದ್ಧ… · Mic warming up — wait, then speak when green/gi, "")
+              .trim();
+            return cleaned || "ಈಗ ಮಾತನಾಡಿ · Speak now in Kannada";
+          });
+          opts.onMicReady?.();
+        },
+      });
     };
 
     const playFormSummary = async (summary: Awaited<ReturnType<typeof fetchFormSummary>>) => {
@@ -360,6 +403,7 @@ export function HandsFreeConversation({
         ? fetchSpeakKannada(phrases[0]).catch(() => "")
         : Promise.resolve("");
       setSubtitle(opener);
+      await waitForUiPaint();
       await playKannada(opener);
       if (!still()) return;
 
@@ -371,6 +415,7 @@ export function HandsFreeConversation({
           : fetchSpeakKannada(FORM_SUMMARY_CLOSER_KN).catch(() => "");
         setSummaryActiveIndex(i);
         setSubtitle(phrase);
+        await waitForUiPaint();
         await playKannada(phrase, audio);
         if (!still()) return;
       }
@@ -420,6 +465,8 @@ export function HandsFreeConversation({
       setHint(`ಅರ್ಜಿ: ${detail.title_kn}`);
       await runFormLoop();
       if (!still()) return;
+      // Balance inquiry already spoke the result and should not reopen assist TTS.
+      if (formId === "balance_inquiry") return;
       await continueAssist();
     };
 
@@ -430,8 +477,7 @@ export function HandsFreeConversation({
       const menuIds = items.map((item) => item.id);
 
       while (still()) {
-        setTurn("listening");
-        const blob = await listenOnceRef.current({ silenceMs: 1200, minSpeechMs: 400 });
+        const blob = await listenForSpeech({ silenceMs: 1200, minSpeechMs: 400 });
         if (!still()) return;
         if (!blob) continue;
 
@@ -554,9 +600,8 @@ export function HandsFreeConversation({
             await playKannadaLine(summary.confirm_prompt_kn || FORM_WHOLE_CONFIRM_KN);
             if (!still()) return;
 
-            setTurn("listening");
             setHint("ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ · Say yes or no");
-            const confirmBlob = await listenOnceRef.current({ silenceMs: 1200, minSpeechMs: 350 });
+            const confirmBlob = await listenForSpeech({ silenceMs: 1200, minSpeechMs: 350 });
             if (!still()) return;
             if (!confirmBlob) {
               setHint("ದಯವಿಟ್ಟು ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ");
@@ -663,8 +708,7 @@ export function HandsFreeConversation({
         }
         if (!still()) return;
 
-        setTurn("listening");
-        const blob = await listenOnceRef.current(formListenOpts(field));
+        const blob = await listenForSpeech(formListenOpts(field));
         if (!still()) return;
         if (!blob) {
           setHint("ದಯವಿಟ್ಟು ಸ್ವಲ್ಪ ಜೋರಾಗಿ ಮತ್ತು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ · Speak clearly, a little louder");
@@ -724,14 +768,34 @@ export function HandsFreeConversation({
 
           setTurn("form_confirm");
 
-          const confirmLine = value
-            ? `${value}. ${FORM_CONFIRM_SUFFIX_KN}`
+          // Speak account/mobile as Kannada digit words — Parler misreads "1234567890".
+          const DIGIT_KN: Record<string, string> = {
+            "0": "ಸೊನ್ನೆ",
+            "1": "ಒಂದು",
+            "2": "ಎರಡು",
+            "3": "ಮೂರು",
+            "4": "ನಾಲ್ಕು",
+            "5": "ಐದು",
+            "6": "ಆರು",
+            "7": "ಏಳು",
+            "8": "ಎಂಟು",
+            "9": "ಒಂಬತ್ತು",
+          };
+          const spokenValue =
+            field.type === "digits" && value && /^\d+$/.test(value)
+              ? value
+                  .split("")
+                  .map((ch) => DIGIT_KN[ch] ?? ch)
+                  .join(" ")
+              : value;
+
+          const confirmLine = spokenValue
+            ? `${spokenValue}. ${FORM_CONFIRM_SUFFIX_KN}`
             : FORM_CONFIRM_SUFFIX_KN;
           await playKannada(confirmLine);
           if (!still()) return;
 
-          setTurn("listening");
-          const confirmBlob = await listenOnceRef.current();
+          const confirmBlob = await listenForSpeech();
           if (!still()) return;
           if (!confirmBlob) continue;
 
@@ -800,21 +864,23 @@ export function HandsFreeConversation({
         await playKannadaLine(ASK_NEED_KN);
         if (!still()) return;
       } else {
-        setTurn("listening");
-        setHint("ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು? · Speak your request in Kannada");
+        setHint("ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು? · Wait for Listening, then speak in Kannada");
       }
 
       while (still()) {
         setMode("assist");
         setError(null);
-        setTurn("listening");
-        if (!hint?.includes("Speak")) setHint(null);
 
-        const blob = await listenOnceRef.current();
+        const blob = await listenForSpeech();
         if (!still()) return;
         if (!blob) {
           emptyListenCount += 1;
-          if (emptyListenCount >= 2) {
+          // Do not speak on every empty listen — that creates listen↔speak loops
+          // when the room is quiet or the mic picks up echo.
+          if (emptyListenCount === 2) {
+            setHint("ಕೇಳಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಸ್ಪಷ್ಟವಾಗಿ ಹೇಳಿ · Please speak clearly");
+          }
+          if (emptyListenCount >= 4) {
             setHint("ಕೇಳಲಿಲ್ಲ — ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ");
             await playKannada("ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ");
             emptyListenCount = 0;
@@ -993,6 +1059,8 @@ export function HandsFreeConversation({
 
       {(error || vadError) && <p className="api-warning">{error ?? vadError}</p>}
       {submitWarning && <p className="api-warning api-warning--soft">{submitWarning}</p>}
+
+      <SpeakGuideCard compact />
 
       {balanceResult && <BalanceResultCard result={balanceResult} />}
 

@@ -32,6 +32,9 @@ os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ.setdefault("HF_DATASETS_OFFLINE", "1")
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("BANK_PIPELINE_KEEP_LOADED", "1")
+# Windows CUDA builds usually lack Triton; disable compile paths that spam stderr.
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
 # auto = Parler when available, else MMS (offline).
 _tts = os.environ.get("BANK_TTS_ENGINE", "mms").strip().lower()
 os.environ["BANK_TTS_ENGINE"] = _tts
@@ -40,7 +43,11 @@ os.environ.setdefault("BANK_TTS_SPEAKER", "Suresh")
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Keep protocol stdout clean — torch/triton may print noise on import.
+from backend.quiet_torch import install_quiet_triton_stderr  # noqa: E402
+
+install_quiet_triton_stderr()
+
+# Keep protocol stdout clean — torch may print noise on import.
 _REAL_STDOUT = sys.stdout
 sys.stdout = sys.stderr
 
@@ -305,15 +312,26 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
                 if not value.strip():
                     value = kannada.strip()
 
-        # Account / digit fields: also parse Kannada script directly
+        # Prefer the most plausible digit string (do not overwrite a good English retry).
         if field_type == "digits" or field_id == "account_number":
             from backend.forms.kannada_digits import extract_digits_from_kannada
 
-            kn_digits = extract_digits_from_kannada(kannada)
-            if len(kn_digits) >= 8:
-                value = kn_digits
-            elif kn_digits and not value:
-                value = kn_digits
+            candidates = [
+                "".join(ch for ch in (value or "") if ch.isdigit()),
+                extract_digits_from_kannada(kannada),
+                extract_digits_from_kannada(english) if english else "",
+            ]
+            best = ""
+            for candidate in candidates:
+                if not candidate:
+                    continue
+                if plausible_digit_capture(candidate, field_id):
+                    best = candidate
+                    break
+                if len(candidate) > len(best):
+                    best = candidate
+            if best:
+                value = best
         from backend.forms.validation import validate_captured_value
 
         validation_error = validate_captured_value(

@@ -34,6 +34,7 @@ import {
 import { HandsFreeConversation, type HandsFreeTurn } from "./HandsFreeConversation";
 
 import { LobbyBot, type MascotMood } from "./LobbyBot";
+import { SpeakGuideCard } from "./SpeakGuideCard";
 
 interface AgentLobbyProps {
   apiOnline: boolean | null;
@@ -304,6 +305,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
 
         const greet = pickGreetingNow(greetCatalog);
         setActiveGreet(greet);
+        setGreetStatus("ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ… · Preparing greeting voice");
         setStatus((prev) =>
           prev ? { ...prev, phase: "greeting", person_present: true } : prev,
         );
@@ -580,11 +582,15 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
                     <button type="button" className="lobby-cta" onClick={() => void handleManualStart()}>
                       ಪ್ರಾರಂಭಿಸಿ · Start
                     </button>
+                    <SpeakGuideCard />
                   </>
                 ) : (
                   <>
                     <p className="lobby-invite-kn">{activeGreet.line_kn}</p>
                     <p className="lobby-invite-en">{activeGreet.line_en}</p>
+                    <p className="lobby-invite-wait">
+                      ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ — ಕಾಯಿರಿ · Preparing voice — please wait
+                    </p>
                   </>
                 )}
               </div>
@@ -650,6 +656,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
                 active={phase === "conversation"}
                 apiOnline={apiOnline}
                 kioskSessionId={status?.current_session_id ?? null}
+                skipInitialPrompt
                 onRequestEnd={(reason) => void handleEnd(reason)}
                 onTurnChange={(turn) => setConvoMood(mapTurnToMood(turn))}
                 onFormModeChange={(inForm) => {

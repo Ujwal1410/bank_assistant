@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 NAME_FIELD_IDS = frozenset(
     {
         "full_name",
@@ -16,6 +18,14 @@ MOBILE_FIELD_IDS = frozenset({"mobile_number", "old_mobile", "new_mobile"})
 ACCOUNT_FIELD_IDS = frozenset(
     {"account_number", "remitter_account", "beneficiary_account"}
 )
+
+
+def expected_account_length() -> int:
+    """Demo kiosk account length (default 10)."""
+    try:
+        return max(4, int(os.environ.get("BANK_DEMO_ACCOUNT_LENGTH", "10")))
+    except ValueError:
+        return 10
 
 
 def form_fill_beam_size(field_type: str, field_id: str) -> int:
@@ -52,6 +62,18 @@ def form_fill_stt_hints(field_type: str, field_id: str) -> tuple[str | None, str
                     "zero one two three four five six seven eight nine"
                 ),
             )
+        if fid in ACCOUNT_FIELD_IDS:
+            n = expected_account_length()
+            return (
+                (
+                    f"ಇದು {n} ಅಂಕಿಯ ಖಾತೆ ಸಂಖ್ಯೆ. ಪ್ರತಿಯೊಂದು ಅಂಕಿಯನ್ನು ಪ್ರತ್ಯೇಕವಾಗಿ "
+                    "ಹೇಳಲಾಗಿದೆ. ಕೊನೆಯಲ್ಲಿ ಸೊನ್ನೆ ಇರಬಹುದು."
+                ),
+                (
+                    "ಸೊನ್ನೆ ಶೂನ್ಯ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು ಏಳು ಎಂಟು ಒಂಬತ್ತು "
+                    "zero oh o one two three four five six seven eight nine"
+                ),
+            )
         return (
             "ಇದು ಬ್ಯಾಂಕ್ ಅರ್ಜಿಯ ಸಂಖ್ಯೆ. ಪ್ರತಿಯೊಂದು ಅಂಕಿಯನ್ನು ಕನ್ನಡದಲ್ಲಿ ಹೇಳಲಾಗಿದೆ.",
             "ಸೊನ್ನೆ ಒಂದು ಎರಡು ಮೂರು ನಾಲ್ಕು ಐದು ಆರು ಏಳು ಎಂಟು ಒಂಬತ್ತು",
@@ -65,7 +87,7 @@ def plausible_digit_capture(digits: str, field_id: str) -> bool:
     if fid in MOBILE_FIELD_IDS:
         return len(digits) == 10
     if fid in ACCOUNT_FIELD_IDS:
-        return 8 <= len(digits) <= 18
+        return len(digits) == expected_account_length()
     if fid == "number_of_leaves":
         return digits in {"10", "25", "50"}
     return bool(digits)
@@ -74,8 +96,13 @@ def plausible_digit_capture(digits: str, field_id: str) -> bool:
 def english_digit_retry_hints(field_id: str) -> tuple[str, str]:
     """Context for a same-model English decode when Kannada digit decode fails."""
     fid = (field_id or "").lower()
-    subject = "ten digit mobile number" if fid in MOBILE_FIELD_IDS else "banking number"
+    if fid in MOBILE_FIELD_IDS:
+        subject = "ten digit mobile number"
+    elif fid in ACCOUNT_FIELD_IDS:
+        subject = f"{expected_account_length()} digit bank account number"
+    else:
+        subject = "banking number"
     return (
-        f"The speaker is saying a {subject}, one digit at a time.",
-        "zero one two three four five six seven eight nine",
+        f"The speaker is saying a {subject}, one digit at a time including any final zero.",
+        "zero oh o one two three four five six seven eight nine",
     )

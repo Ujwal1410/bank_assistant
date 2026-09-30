@@ -78,19 +78,21 @@ def _split_sentences(text: str) -> list[str]:
     return [p.strip() for p in parts if p.strip()]
 
 
-def _normalise_digits(text: str) -> str:
+def prepare_kannada_for_tts(text: str) -> str:
     """
-    Replace ASCII digits with Kannada word equivalents.
+    Replace digits with Kannada word equivalents before synthesis.
 
-    IndicTrans2 sometimes preserves ASCII digits inside Kannada output
-    (e.g. "3 ಪಾಯಿಂಟ್ 5"). VitsModel produces artefacts on these mixed-script
-    tokens. Replacing with Kannada words produces smoother output.
+    Parler mis-reads long ASCII digit strings (account / mobile numbers) as
+    huge quantities or English nonsense. Digit-by-digit Kannada words keep
+    confirmations intelligible.
     """
-    def digit_words(raw: str) -> str:
-        return " ".join(_DIGIT_MAP[ch] for ch in raw if ch in _DIGIT_MAP)
+    if not text:
+        return text
 
-    # Currency must be read as a number, not as unrelated individual digits.
-    from backend.forms.summary_kn import amount_speak_kn
+    from backend.forms.summary_kn import amount_speak_kn, digits_to_kannada_words
+
+    # Native Kannada numerals → ASCII first
+    text = text.translate(str.maketrans("೦೧೨೩೪೫೬೭೮೯", "0123456789"))
 
     text = re.sub(
         r"(?<!\d)(\d[\d,]*(?:\.\d{1,2})?)\s*ರೂಪಾಯಿ",
@@ -100,11 +102,20 @@ def _normalise_digits(text: str) -> str:
     text = re.sub(
         r"(?<!\d)(\d+)\.(\d+)(?!\d)",
         lambda match: (
-            f"{digit_words(match.group(1))} ಪಾಯಿಂಟ್ {digit_words(match.group(2))}"
+            f"{digits_to_kannada_words(match.group(1))} ಪಾಯಿಂಟ್ "
+            f"{digits_to_kannada_words(match.group(2))}"
         ),
         text,
     )
-    return re.sub(r"\d+", lambda match: digit_words(match.group(0)), text)
+    return re.sub(
+        r"\d+",
+        lambda match: digits_to_kannada_words(match.group(0)),
+        text,
+    )
+
+
+# Backward-compatible alias used by MMS path below.
+_normalise_digits = prepare_kannada_for_tts
 
 
 class KannadaSpeaker:

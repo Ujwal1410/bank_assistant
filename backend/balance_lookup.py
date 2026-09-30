@@ -1,25 +1,19 @@
-"""Demo account balance lookup — simulates core banking for the kiosk."""
+"""Demo / production-shaped account balance lookup for the kiosk."""
 
 from __future__ import annotations
 
-import json
 import os
 import re
 
+from backend.db.customers import get_account_balance, write_balance_audit
 from backend.forms.summary_kn import amount_speak_kn, digits_to_kannada_words
-
-_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-_ACCOUNTS_PATH = os.path.join(_PROJECT_ROOT, "data", "demo_accounts.json")
-
-with open(_ACCOUNTS_PATH, encoding="utf-8") as _f:
-    _ACCOUNTS: dict[str, dict] = json.load(_f)
 
 
 def _normalize_account(raw: str) -> str:
     return re.sub(r"\D", "", raw or "")
 
 
-def lookup_balance(account_number: str) -> dict:
+def lookup_balance(account_number: str, *, kiosk_session_id: str = "") -> dict:
     acct = _normalize_account(account_number)
     try:
         expected_length = max(4, int(os.environ.get("BANK_DEMO_ACCOUNT_LENGTH", "10")))
@@ -31,6 +25,12 @@ def lookup_balance(account_number: str) -> dict:
             if expected_length == 10
             else digits_to_kannada_words(str(expected_length))
         )
+        write_balance_audit(
+            account_number=acct,
+            found=False,
+            kiosk_session_id=kiosk_session_id,
+            source="length_reject",
+        )
         return {
             "found": False,
             "account_number": acct,
@@ -41,9 +41,15 @@ def lookup_balance(account_number: str) -> dict:
             ),
         }
 
-    row = _ACCOUNTS.get(acct)
+    row = get_account_balance(acct)
     if not row:
         spoken_acct = digits_to_kannada_words(acct)
+        write_balance_audit(
+            account_number=acct,
+            found=False,
+            kiosk_session_id=kiosk_session_id,
+            source="not_found",
+        )
         return {
             "found": False,
             "account_number": acct,
@@ -63,6 +69,13 @@ def lookup_balance(account_number: str) -> dict:
     name_en = row.get("holder_name", "")
     spoken_acct = digits_to_kannada_words(acct)
     spoken_balance = amount_speak_kn(str(bal))
+    write_balance_audit(
+        account_number=acct,
+        found=True,
+        customer_id=row.get("customer_id"),
+        kiosk_session_id=kiosk_session_id,
+        source=str(row.get("source") or "lookup"),
+    )
 
     return {
         "found": True,
@@ -71,6 +84,8 @@ def lookup_balance(account_number: str) -> dict:
         "holder_name": name_en,
         "holder_name_kn": name_kn,
         "account_type": row.get("account_type", "Savings"),
+        "customer_id": row.get("customer_id"),
+        "source": row.get("source"),
         "message_en": (
             f"Account {acct} in the name of {name_en}. "
             f"Your available balance is {bal_str} rupees."

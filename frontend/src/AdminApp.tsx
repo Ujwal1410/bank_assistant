@@ -1,16 +1,38 @@
 import { useEffect, useState } from "react";
 import { checkHealth, fetchAdminMe } from "./api/client";
 import { clearAdminSession, getAdminUsername, isAdminLoggedIn } from "./auth/adminSession";
+import { AdminConversationFlow } from "./components/AdminConversationFlow";
+import { AdminCustomers } from "./components/AdminCustomers";
 import { AdminLogin } from "./components/AdminLogin";
 import { AdminPanel } from "./components/AdminPanel";
+import { AdminSpeechHistory } from "./components/AdminSpeechHistory";
 import { getLobbyUrl } from "./utils/apiBase";
 import { startVisibilityAwarePoll } from "./utils/polling";
 
-/** Staff console — lobby & voice assistant control. */
+type AdminView = "lobby" | "customers" | "speech" | "flow";
+
+function viewFromHash(): AdminView {
+  const hash = (window.location.hash || "").replace(/^#/, "").toLowerCase();
+  if (hash === "customers" || hash.startsWith("customers")) return "customers";
+  if (hash === "speech" || hash === "speech-history" || hash.startsWith("speech")) return "speech";
+  if (hash === "flow" || hash === "conversation-flow" || hash.startsWith("flow")) return "flow";
+  if (hash === "form-submissions") return "lobby";
+  return "lobby";
+}
+
+const VIEW_TITLES: Record<AdminView, { kn: string; crumb: string }> = {
+  lobby: { kn: "ಲಾಬಿ ನಿಯಂತ್ರಣ", crumb: "Staff · Lobby" },
+  customers: { kn: "ಗ್ರಾಹಕರು", crumb: "Staff · Customers" },
+  speech: { kn: "ಮಾತು ಇತಿಹಾಸ", crumb: "Staff · Speech turns" },
+  flow: { kn: "ಸಂವಾದ ಹರಿವು", crumb: "Staff · Conversation flow" },
+};
+
+/** Staff console — lobby, customers, speech history, and conversation map. */
 export function AdminApp() {
   const [connected, setConnected] = useState<boolean | null>(null);
   const [adminAuthed, setAdminAuthed] = useState(() => isAdminLoggedIn());
   const [adminChecking, setAdminChecking] = useState(false);
+  const [view, setView] = useState<AdminView>(() => viewFromHash());
   const username = getAdminUsername() ?? "Staff";
 
   useEffect(() => {
@@ -74,6 +96,28 @@ export function AdminApp() {
     };
   }, []);
 
+  useEffect(() => {
+    const onHash = () => setView(viewFromHash());
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
+  const go = (next: AdminView) => {
+    const hash =
+      next === "lobby"
+        ? ""
+        : next === "customers"
+          ? "#customers"
+          : next === "speech"
+            ? "#speech-history"
+            : "#conversation-flow";
+    if (hash) window.location.hash = hash;
+    else if (window.location.hash) {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    setView(next);
+  };
+
   if (adminChecking) {
     return (
       <div className="adm-gate-loading adm-gate-loading--fullscreen">
@@ -86,6 +130,8 @@ export function AdminApp() {
   if (!adminAuthed) {
     return <AdminLogin apiOnline={connected} onSuccess={() => setAdminAuthed(true)} />;
   }
+
+  const titles = VIEW_TITLES[view];
 
   return (
     <div className="adm-shell">
@@ -103,7 +149,12 @@ export function AdminApp() {
         <p className="adm-sidebar-tag">Staff console</p>
 
         <nav className="adm-sidebar-nav">
-          <a className="adm-nav-item is-active" href="/" aria-current="page">
+          <button
+            type="button"
+            className={`adm-nav-item ${view === "lobby" ? "is-active" : ""}`}
+            aria-current={view === "lobby" ? "page" : undefined}
+            onClick={() => go("lobby")}
+          >
             <svg className="adm-nav-svg" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M4 13h6v7H4v-7zm10-9h6v16h-6V4zM4 4h6v5H4V4z"
@@ -116,8 +167,66 @@ export function AdminApp() {
               <span className="kn">ಲಾಬಿ ನಿಯಂತ್ರಣ</span>
               <span className="adm-nav-sub">Lobby control</span>
             </span>
-          </a>
-          <a className="adm-nav-item" href="/#form-submissions">
+          </button>
+          <button
+            type="button"
+            className={`adm-nav-item ${view === "customers" ? "is-active" : ""}`}
+            aria-current={view === "customers" ? "page" : undefined}
+            onClick={() => go("customers")}
+          >
+            <svg className="adm-nav-svg" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M12 12a4 4 0 100-8 4 4 0 000 8zm-7 9a7 7 0 0114 0"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+            <span>
+              <span className="kn">ಗ್ರಾಹಕರು</span>
+              <span className="adm-nav-sub">Customers & balances</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`adm-nav-item ${view === "speech" ? "is-active" : ""}`}
+            aria-current={view === "speech" ? "page" : undefined}
+            onClick={() => go("speech")}
+          >
+            <svg className="adm-nav-svg" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M12 3v10a3 3 0 01-3 3H7l-3 3V8a5 5 0 015-5h3zm2 2h1a5 5 0 015 5v11l-3-3h-1a3 3 0 01-3-3V5z"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              <span className="kn">ಮಾತು ಇತಿಹಾಸ</span>
+              <span className="adm-nav-sub">Speech turns</span>
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`adm-nav-item ${view === "flow" ? "is-active" : ""}`}
+            aria-current={view === "flow" ? "page" : undefined}
+            onClick={() => go("flow")}
+          >
+            <svg className="adm-nav-svg" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path
+                d="M5 6h6v4H5V6zm8 0h6v4h-6V6zM5 14h6v4H5v-4zm8 2h6M8 10v4m8-4v2"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span>
+              <span className="kn">ಸಂವಾದ ಹರಿವು</span>
+              <span className="adm-nav-sub">Where speech goes</span>
+            </span>
+          </button>
+          <a className="adm-nav-item" href="/#form-submissions" onClick={() => go("lobby")}>
             <svg className="adm-nav-svg" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
                 d="M6 4h12v16H6V4zm2 2v12h8V6H8zm2 2h4v2h-4V8zm0 4h4v2h-4v-2z"
@@ -147,8 +256,8 @@ export function AdminApp() {
       <div className="adm-body">
         <header className="adm-topbar">
           <div className="adm-topbar-titles">
-            <p className="adm-topbar-crumb">Staff · Dashboard</p>
-            <h1 className="kn">ಲಾಬಿ ನಿಯಂತ್ರಣ</h1>
+            <p className="adm-topbar-crumb">{titles.crumb}</p>
+            <h1 className="kn">{titles.kn}</h1>
           </div>
           <div className="adm-topbar-actions">
             <span className="adm-user-chip">{username}</span>
@@ -163,12 +272,17 @@ export function AdminApp() {
         </header>
 
         <main className="adm-page">
-          <AdminPanel
-            apiOnline={connected}
-            username={username}
-            onOpenLobby={() => window.open(getLobbyUrl(), "_blank", "noopener,noreferrer")}
-            onLogout={() => setAdminAuthed(false)}
-          />
+          {view === "lobby" && (
+            <AdminPanel
+              apiOnline={connected}
+              username={username}
+              onOpenLobby={() => window.open(getLobbyUrl(), "_blank", "noopener,noreferrer")}
+              onLogout={() => setAdminAuthed(false)}
+            />
+          )}
+          {view === "customers" && <AdminCustomers apiOnline={connected} />}
+          {view === "speech" && <AdminSpeechHistory apiOnline={connected} />}
+          {view === "flow" && <AdminConversationFlow apiOnline={connected} />}
         </main>
       </div>
     </div>

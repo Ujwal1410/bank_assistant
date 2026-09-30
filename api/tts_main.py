@@ -23,6 +23,10 @@ from dotenv import load_dotenv
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(dotenv_path=os.path.join(_ROOT, ".env"), override=True)
 
+from backend.quiet_torch import install_quiet_triton_stderr  # noqa: E402
+
+install_quiet_triton_stderr()
+
 # TTS box: Parler only — no pipeline worker, no STT on GPU
 os.environ.setdefault("BANK_TTS_ENGINE", "parler")
 os.environ.setdefault("BANK_PIPELINE_WORKER", "0")
@@ -32,7 +36,8 @@ os.environ.setdefault("BANK_PARLER_DTYPE", "fp16")
 os.environ.setdefault("BANK_PARLER_DO_SAMPLE", "1")
 os.environ.setdefault("BANK_PARLER_REQUIRE_CUDA", "1")
 os.environ.setdefault("BANK_PARLER_ATTN_IMPLEMENTATION", "sdpa")
-os.environ.setdefault("BANK_PARLER_COMPILE", "default")
+# Avoid torch.compile/Triton on Windows CUDA builds (noise + failed compiles).
+os.environ.setdefault("BANK_PARLER_COMPILE", "0")
 os.environ.setdefault("BANK_PARLER_MAX_NEW_TOKENS", "1500")
 os.environ.setdefault("BANK_PARLER_MIN_NEW_TOKENS", "280")
 os.environ.setdefault("BANK_PARLER_TOKENS_PER_CHAR", "40")
@@ -53,6 +58,7 @@ from backend.tts.parler_bridge import (  # noqa: E402
     stop_worker,
 )
 from backend.tts.speak_cache import get_cached_b64, kannada_to_b64  # noqa: E402
+from backend.tts.warmup import warm_parler_service  # noqa: E402
 _warm_stats: dict = {}
 _synth_semaphore = asyncio.Semaphore(
     max(1, int(os.environ.get("BANK_TTS_CONCURRENCY", "1")))
@@ -80,24 +86,25 @@ def _synth_b64(
 
 @asynccontextmanager
 async def _lifespan(_app: FastAPI):
-    """Load the model once; static cache generation is a deployment task."""
+    """Load Parler and pre-cache common lobby phrases so first speak is fast."""
     global _warm_stats
     print(
-        "[tts-server] Loading Parler FP16 model "
-        "(first start may take 1–2 minutes)…",
+        "[tts-server] Loading Parler + warming common phrases "
+        "(first start may take several minutes)…",
         file=sys.stderr,
         flush=True,
     )
     started = time.perf_counter()
-    ready = await asyncio.to_thread(ensure_parler_ready)
+    warm = await asyncio.to_thread(warm_parler_service)
+    ready = bool(warm.get("ok")) and bool(warm.get("ready") or ensure_parler_ready())
     _warm_stats = {
         "ok": ready,
         "model_ready": ready,
-        "phrases_cached": 0,
-        "cache_warm": "deployment-managed",
-        "speaker": default_speaker(),
+        "phrases_cached": int(warm.get("phrases_cached") or 0),
+        "cache_warm": "startup-prewarm",
+        "speaker": warm.get("speaker") or default_speaker(),
         "elapsed_s": round(time.perf_counter() - started, 1),
-        "error": None if ready else parler_warm_error(),
+        "error": None if ready else (warm.get("error") or parler_warm_error()),
     }
     if _warm_stats.get("ok"):
         print(

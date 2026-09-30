@@ -130,6 +130,10 @@ def kannada_to_b64(
         return ""
 
     from backend.tts.remote_bridge import fetch_kannada_b64_remote, remote_tts_configured
+    from backend.tts.speaker import prepare_kannada_for_tts
+
+    # Normalize before cache lookup so "1234…" and spoken Kannada share one clip.
+    text = prepare_kannada_for_tts(text)
 
     engine = os.environ.get("BANK_TTS_ENGINE", "mms").strip().lower()
     from backend.tts.parler_bridge import parler_available

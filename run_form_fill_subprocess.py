@@ -110,11 +110,22 @@ try:
         if field_type == "digits" or field_id == "account_number":
             from backend.forms.kannada_digits import extract_digits_from_kannada
 
-            kn_digits = extract_digits_from_kannada(kannada)
-            if len(kn_digits) >= 8:
-                value = kn_digits
-            elif kn_digits and not value:
-                value = kn_digits
+            candidates = [
+                "".join(ch for ch in (value or "") if ch.isdigit()),
+                extract_digits_from_kannada(kannada),
+                extract_digits_from_kannada(english) if english else "",
+            ]
+            best = ""
+            for candidate in candidates:
+                if not candidate:
+                    continue
+                if plausible_digit_capture(candidate, field_id):
+                    best = candidate
+                    break
+                if len(candidate) > len(best):
+                    best = candidate
+            if best:
+                value = best
         from backend.forms.validation import validate_captured_value
 
         validation_error = validate_captured_value(

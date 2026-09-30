@@ -106,6 +106,11 @@ def synthesise_kannada(
     if not kannada_text or not kannada_text.strip():
         return None
 
+    from backend.tts.speaker import prepare_kannada_for_tts
+
+    # Parler must also receive digit words — raw "1234567890" is misread.
+    kannada_text = prepare_kannada_for_tts(kannada_text)
+
     selected_speaker = speaker
     if not selected_speaker and voice_description:
         v = voice_description.strip().lower()

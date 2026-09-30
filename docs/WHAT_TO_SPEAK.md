@@ -1,26 +1,39 @@
 # What to Speak — Kannada Voice Banking Guide
 
-**Audience:** Demo staff, testers, college lab customers  
-**Agent URL:** `https://localhost:5173` (or your kiosk IP)  
+**Audience:** Demo staff, testers, juniors running the kiosk  
+**Agent URL:** `https://127.0.0.1:5173` (or `https://<kiosk-ip>:5173` on same Wi‑Fi)  
+**Admin URL:** `https://127.0.0.1:5174` — Customers, Speech turns, Conversation flow  
 **Language:** Speak **Kannada** clearly; **English** also works for most intents (STT translates internally).
 
-> **Demo only** — no real money moves. Forms are sample branch slips, not official bank documents.
+> **Demo only** — no real money moves. Forms are sample branch slips, not official bank documents.  
+> On the agent screen, open **ಹೇಗೆ ಮಾತನಾಡುವುದು · How to speak** for the same tips + demo accounts.
 
 ---
 
 ## Quick start
 
-1. Admin opens counter → customer steps into camera frame.
-2. Listen to the **time-based Kannada greeting**.
-3. When you see **ಕೇಳುತ್ತಿದ್ದೇನೆ… · Listening**, speak your request.
-4. Follow voice prompts for forms — confirm each value with **ಸರಿ** or **ಹೌದು**.
-5. Say **ಮುಗಿಸು** or tap **End** to finish.
+1. Admin opens counter → customer steps into camera frame (or taps **Start**).
+2. Greeting text appears on screen first, then voice plays — **wait** (do not speak yet).
+3. Status goes **Preparing** (mic / voice) → then **green Listening** → **now speak**.
+4. One short request in Kannada. For balance, then give all **10** account digits (including final **zero**).
+5. Confirm each form value with **ಹೌದು** / **ಸರಿ**; fix with **ಮತ್ತೆ ಹೇಳಿ** / **ಇಲ್ಲ**.
+6. Say **ಮುಗಿಸು** or tap **End** to finish.
+
+### Screen status (wait vs speak)
+
+| UI status | What it means | What you do |
+|-----------|---------------|-------------|
+| Preparing / Mic warming | Mic or TTS still getting ready | **Wait — do not speak** |
+| Agent speaking | Bot is talking; subtitle shows the text | **Listen** |
+| Green **Listening** | Ready for your turn | **Speak now** |
+| Processing / Thinking | STT + NLU running | Wait |
 
 **Tips**
 
 - Tap the screen once if no sound (browser audio unlock).
-- Wait until the bot **stops speaking** before you talk (reduces echo).
-- Speak **slowly and clearly**; for account numbers, say **one digit at a time**.
+- Wait until the bot **stops speaking** and status is green Listening before you talk.
+- Speak **slowly and clearly**; for account numbers, say **one digit at a time**, pause between digits.
+- Must say **all 10 digits** — missing the last `0` fails (e.g. `123456789` ≠ `1234567890`).
 - Stand within the camera frame during the session.
 
 ---
@@ -76,19 +89,19 @@ Also: `stop`, `end`, `bye`, `goodbye`, `finish`, `thank you bye`
 
 ## 2. Main banking requests (7 intents)
 
-Say any phrase below after the agent asks *ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು?*
+Say any phrase below after the agent is in **Listening** (greeting already asked how to help).
 
 ### A. Check balance → opens balance form
 
 | Say in Kannada | Say in English |
 |----------------|----------------|
+| ನನ್ನ ಖಾತೆ ಬ್ಯಾಲೆನ್ಸ್ ಹೇಳಿ | Tell me my account balance |
 | ನನ್ನ ಖಾತೆಯ ಬಾಕಿ ಎಷ್ಟು? | What is my account balance? |
 | ಬಾಕಿ ತಿಳಿಸಿ | Tell me my balance |
 | ಖಾತೆ ಬಾಕಿ ಪರಿಶೀಲಿಸಿ | Check my account balance |
-| ನನ್ನ ಖಾತೆಯಲ್ಲಿ ಎಷ್ಟು ಹಣ ಇದೆ? | How much money is in my account? |
 | ಬ್ಯಾಲೆನ್ಸ್ ಎಷ್ಟು? | What is the balance? |
 
-**What happens:** Agent asks for **account number** → you speak it → confirms → speaks balance in Kannada.
+**What happens:** Agent asks for **10-digit account number** → you speak it → confirm → speaks balance in Kannada (digits spoken as Kannada words).
 
 ---
 
@@ -125,7 +138,7 @@ Also: `deposit`, `cash deposit`, `deposit money`
 | Say in Kannada | Say in English |
 |----------------|----------------|
 | ಹೊಸ ಖಾತೆ ತೆರೆಯಬೇಕು | I want to open a new account |
-| ಖಾತೆ ತೆರೆಯಲು ಬಯಸುತ್ತೇನೆ | I would like to open an account |
+| ಸೇವಿಂಗ್ಸ್ ಅಕೌಂಟ್ ತೆರೆಯುವುದು ಹೇಗೆ | How do I open a savings account |
 | ಸೇವಿಂಗ್ಸ್ ಖಾತೆ ಬೇಕು | I want a savings account |
 
 Also: `open account`, `new account`, `savings account`, `current account`
@@ -189,6 +202,7 @@ If you want to see or choose from available forms:
 | ಅರ್ಜಿ ತುಂಬಬೇಕು | I want to fill a form |
 | ಯಾವ ಅರ್ಜಿಗಳು ಲಭ್ಯ? | What forms are available? |
 | ಫಾರ್ಮ್ ಬೇಕು | I need a form |
+| ಚೆಕ್‌ಬುಕ್ ಅರ್ಜಿ | Cheque book form |
 
 Also: `fill form`, `form menu`, `list forms`, `application form`
 
@@ -210,152 +224,85 @@ Also: `fill form`, `form menu`, `list forms`, `application form`
 | mobile update | Mobile number change |
 | stop cheque | Stop cheque request |
 
+Staff can also open **Admin → Conversation flow** to see intent → form → field questions.
+
 ---
 
 ## 4. All forms — what the agent will ask
 
-For each form, the agent speaks the **prompt_kn** shown below. Answer in voice; confirm with **ಸರಿ**.
+For each form, the agent speaks the field prompt. Answer in voice; confirm with **ಸರಿ** / **ಹೌದು**.
 
-### 4.1 ಖಾತೆ ಬಾಕಿ ಪರಿಶೀಲನೆ (Balance inquiry)
+### 4.1 Balance inquiry
 
 | Field | Agent asks (Kannada) | You say |
 |-------|----------------------|---------|
-| Account number | ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ | Demo account (see §5) — digit by digit |
+| Account number | ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ | Demo account (§5) — **10 digits**, one by one |
 
----
-
-### 4.2 ನಗದು ಹಿಂಪಡೆಯುವ ಸ್ಲಿಪ್ (Cash withdrawal)
-
-| Field | Agent asks | You say (example) |
-|-------|------------|-------------------|
-| Name | ದಯವಿಟ್ಟು ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರನ್ನು ಹೇಳಿ | ರಾಮೇಶ್ ಕುಮಾರ್ |
-| Account | ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ | 1234567890 (digit by digit) |
-| Amount | ಹಿಂಪಡೆಯುವ ಮೊತ್ತವನ್ನು ಹೇಳಿ | ಐದು ಸಾವಿರ / five thousand / 5000 |
-| Purpose (optional) | ಉದ್ದೇಶ… ಬಿಟ್ಟುಬಿಡಿ ಎಂದು ಹೇಳಿ | ವೈಯಕ್ತಿಕ ಬಳಕೆ — or **ಬಿಟ್ಟುಬಿಡಿ** |
-
-Date is filled automatically (today).
-
----
-
-### 4.3 ನಗದು / ಚೆಕ್ ಠೇವಣಿ ಸ್ಲಿಪ್ (Cash / cheque deposit)
-
-| Field | Agent asks | You say (example) |
-|-------|------------|-------------------|
-| Name | ಪೂರ್ಣ ಹೆಸರು | ರಾಮೇಶ್ ಕುಮಾರ್ |
-| Account | ಖಾತೆ ಸಂಖ್ಯೆ | 1234567890 |
-| Amount | ಠೇವಣಿ ಮೊತ್ತ | ಮೂರು ಸಾವಿರ / 3000 |
-| Deposit mode | ನಗದು ಅಥವಾ ಚೆಕ್ | ನಗದು or ಚೆಕ್ |
-
----
-
-### 4.4 ವೈಯಕ್ತಿಕ ಖಾತೆ ತೆರೆಯುವ ಅರ್ಜಿ (Open account)
-
-| Field | Agent asks | You say (example) |
-|-------|------------|-------------------|
-| Full name | ಪೂರ್ಣ ಹೆಸರು | ನಿಮ್ಮ ಹೆಸರು |
-| Date of birth | ಜನ್ಮ ದಿನಾಂಕ — ದಿನ, ತಿಂಗಳು, ವರ್ಷ | 15 ಜೂನ್ 1990 |
-| Address | ವಾಸದ ವಿಳಾಸ | ನಿಮ್ಮ ವಿಳಾಸ |
-| Mobile | ಹತ್ತು ಅಂಕಿಯ ಮೊಬೈಲ್ | 9876543210 |
-| PAN | ಪ್ಯಾನ್ ಸಂಖ್ಯೆ | ABCDE1234F |
-| Account type | ಸೇವಿಂಗ್ಸ್, ಕರೆಂಟ್ ಅಥವಾ ಸ್ಯಾಲರಿ | ಸೇವಿಂಗ್ಸ್ |
-
----
-
-### 4.5 ಚಿಲ್ಲರೆ ಸಾಲ ಅರ್ಜಿ (Loan application)
-
-| Field | Agent asks | You say (example) |
-|-------|------------|-------------------|
-| Name | ಪೂರ್ಣ ಹೆಸರು | ನಿಮ್ಮ ಹೆಸರು |
-| Mobile | ಮೊಬೈಲ್ ಸಂಖ್ಯೆ | 9876543210 |
-| Loan type | ಸಾಲದ ವಿಧ | ವೈಯಕ್ತಿಕ ಸಾಲ / home loan |
-| Loan amount | ಸಾಲದ ಮೊತ್ತ | ಐದು ಲಕ್ಷ / five lakh |
-| Income | ಮಾಸಿಕ ಆದಾಯ | ನಲ್ವತ್ತು ಸಾವಿರ |
-
----
-
-### 4.6 RTGS / NEFT ವರ್ಗಾವಣೆ (Fund transfer)
+### 4.2 Cash withdrawal
 
 | Field | You say (example) |
 |-------|-------------------|
-| Remitter name | Your name |
-| Remitter account | Your account number |
-| Beneficiary name | Receiver name |
-| Beneficiary account | Receiver account |
-| IFSC | e.g. SBIN0001234 |
-| Amount | Transfer amount |
-| Remarks (optional) | Payment reason — or **ಬಿಟ್ಟುಬಿಡಿ** |
+| Name | ರಾಮೇಶ್ ಕುಮಾರ್ |
+| Account | 1234567890 (digit by digit) |
+| Amount | ಐದು ಸಾವಿರ / 5000 |
+| Purpose (optional) | ವೈಯಕ್ತಿಕ ಬಳಕೆ — or **ಬಿಟ್ಟುಬಿಡಿ** |
 
----
+Date is filled automatically (today).
 
-### 4.7 ಚೆಕ್ ಬುಕ್ ವಿನಂತಿ (Cheque book)
+### 4.3 Cash / cheque deposit
 
-| Field | You say |
-|-------|---------|
-| Name | Your name |
-| Account | Account number |
-| Number of leaves | 10 / 25 / 50 |
+| Field | You say (example) |
+|-------|-------------------|
+| Name | ರಾಮೇಶ್ ಕುಮಾರ್ |
+| Account | 1234567890 |
+| Amount | ಮೂರು ಸಾವಿರ / 3000 |
+| Deposit mode | ನಗದು or ಚೆಕ್ |
 
----
+### 4.4 Open account
 
-### 4.8 ATM / ಡೆಬಿಟ್ ಕಾರ್ಡ್ ಅರ್ಜಿ
+| Field | You say (example) |
+|-------|-------------------|
+| Full name | ನಿಮ್ಮ ಹೆಸರು |
+| Date of birth | 15 ಜೂನ್ 1990 |
+| Address | ನಿಮ್ಮ ವಿಳಾಸ |
+| Mobile | 9876543210 |
+| PAN | ABCDE1234F |
+| Account type | ಸೇವಿಂಗ್ಸ್ |
 
-| Field | You say |
-|-------|---------|
-| Name | Your name |
-| Account | Account number |
-| Mobile | Mobile number |
-| Card type | ATM / debit / RuPay |
+### 4.5 Loan application
 
----
+| Field | You say (example) |
+|-------|-------------------|
+| Name | ನಿಮ್ಮ ಹೆಸರು |
+| Mobile | 9876543210 |
+| Loan type | ವೈಯಕ್ತಿಕ ಸಾಲ / home loan |
+| Loan amount | ಐದು ಲಕ್ಷ |
+| Income | ನಲ್ವತ್ತು ಸಾವಿರ |
 
-### 4.9 ಸ್ಥಿರ ಠೇವಣಿ (FD)
+### 4.6–4.11 Other forms (via form menu)
 
-| Field | You say |
-|-------|---------|
-| Name | Your name |
-| Account | Account number |
-| FD amount | e.g. ಒಂದು ಲಕ್ಷ |
-| Tenure | e.g. ಒಂದು ವರ್ಷ / 1 year |
-| Interest payout | monthly / quarterly / maturity |
-
----
-
-### 4.10 ಮೊಬೈಲ್ ಸಂಖ್ಯೆ ನವೀಕರಣ
-
-| Field | You say |
-|-------|---------|
-| Name | Your name |
-| Account | Account number |
-| Old mobile | Old 10-digit number |
-| New mobile | New 10-digit number |
-
----
-
-### 4.11 ಚೆಕ್ ನಿಲ್ಲಿಸುವ ವಿನಂತಿ (Stop cheque)
-
-| Field | You say |
-|-------|---------|
-| Name | Your name |
-| Account | Account number |
-| Cheque number | Cheque number |
-| Amount | Cheque amount |
-| Reason (optional) | Lost / stolen — or **ಬಿಟ್ಟುಬಿಡಿ** |
+RTGS/NEFT, cheque book, ATM/debit card, FD, mobile update, stop cheque — follow on-screen prompts; optional fields can be skipped with **ಬಿಟ್ಟುಬಿಡಿ**.
 
 ---
 
 ## 5. Demo account numbers (balance only)
 
-**Only these accounts return a balance.** Any other number → “account not found” in Kannada.
+**Only these 10-digit accounts return a balance** (`data/demo_accounts.json` / sqlite customer store). Any other number → “account not found” in Kannada.
 
-| Account number | Name (Kannada) | Balance (₹) | Type |
-|----------------|----------------|-------------|------|
-| **1234567890** | ರಾಮೇಶ್ ಕುಮಾರ್ | 45,230.50 | Savings |
-| **9876543210** | ಅನಿತಾ ರಾವ್ | 12,500.00 | Savings |
-| **1111222233** | ಸುರೇಶ್ ಗೌಡ | 89,340.75 | Current |
+| Account number | Name (Kannada) | Name (EN) | Balance (₹) | Type |
+|----------------|----------------|-----------|-------------|------|
+| **1234567890** | ರಾಮೇಶ್ ಕುಮಾರ್ | Ramesh Kumar | 45,230.50 | Savings |
+| **9876543210** | ಅನಿತಾ ರಾವ್ | Anita Rao | 12,500.00 | Savings |
+| **1111222233** | ಸುರೇಶ್ ಗೌಡ | Suresh Gowda | 89,340.75 | Current |
+| **2222333344** | ಲಕ್ಷ್ಮಿ ದೇವಿ | Lakshmi Devi | 67,890.25 | Savings |
+| **5555666677** | ಪ್ರಕಾಶ್ ಶೆಟ್ಟಿ | Prakash Shetty | 15,250.00 | Savings |
+| **8888999900** | ಮೀನಾ ಪಾಟೀಲ್ | Meena Patil | 2,40,075.50 | Current |
+
+Admin → **Customers** shows the same list + balance lookup audit.
 
 ### How to speak account numbers
 
-**Best:** One digit at a time, pause between each.
+**Best:** One digit at a time, pause between each. Include the **final zero**.
 
 **Kannada (for 1234567890):**
 ```
@@ -366,8 +313,6 @@ Date is filled automatically (today).
 ```
 one two three four five six seven eight nine zero
 ```
-
-**Or:** Say the full number slowly: `1 2 3 4 5 6 7 8 9 0`
 
 After the agent repeats the number, say **ಸರಿ** or **ಹೌದು**.
 
@@ -392,50 +337,43 @@ You can also say plain digits: `5000`, `five zero zero zero`.
 ### Script A — Balance (1–2 min) ⭐ Best demo
 
 ```
-1. [Stand in camera — hear greeting]
-2. You:  ನನ್ನ ಖಾತೆಯ ಬಾಕಿ ಎಷ್ಟು?
-3. Agent: asks account number
+1. [Stand in camera — hear greeting; wait for green Listening]
+2. You:  ನನ್ನ ಖಾತೆ ಬ್ಯಾಲೆನ್ಸ್ ಹೇಳಿ
+3. Agent: asks account number (wait for Listening again)
 4. You:  one two three four five six seven eight nine zero
-         (or Kannada digits slowly)
-5. Agent: repeats number — "ಸರಿಯೇ?"
-6. You:  ಸರಿ
+         (all 10 digits — include final zero)
+5. Agent: repeats number — confirm?
+6. You:  ಹೌದು
 7. Agent: speaks balance for ರಾಮೇಶ್ ಕುಮಾರ್ — ₹45,230.50
 8. You:  ಮುಗಿಸು   (or tap End)
 ```
-
----
 
 ### Script B — Cash withdrawal (3–4 min)
 
 ```
 1. You:  ಹಣ ಹಿಂಪಡೆಯಬೇಕು
 2. Name:     ರಾಮೇಶ್ ಕುಮಾರ್
-3. Account:  1234567890 (digit by digit) → ಸರಿ
-4. Amount:   ಐದು ಸಾವಿರ → ಸರಿ
+3. Account:  1234567890 (digit by digit) → ಹೌದು
+4. Amount:   ಐದು ಸಾವಿರ → ಹೌದು
 5. Purpose:  ಬಿಟ್ಟುಬಿಡಿ  (skip)
 6. [Form preview → Print if needed]
-7. Agent: ಬೇರೆ ಯಾವುದಾದರೂ ಸಹಾಯ ಬೇಕೇ?
 ```
-
----
 
 ### Script C — Interest rates (30 sec)
 
 ```
 1. You:  ಬಡ್ಡಿ ದರ ಎಷ್ಟು?
 2. [Listen — agent speaks savings, FD, loan rates]
-3. You:  ಧನ್ಯವಾದ / ಮುಗಿಸು
+3. You:  ಮುಗಿಸು
 ```
-
----
 
 ### Script D — Form menu (2 min)
 
 ```
 1. You:  ಅರ್ಜಿ ತುಂಬಬೇಕು
 2. [Screen shows numbered list]
-3. You:  ಎರಡು   (or say "deposit")
-4. [Follow deposit form prompts]
+3. You:  ಎರಡು   (or say "deposit" / "cheque book")
+4. [Follow form prompts]
 ```
 
 ---
@@ -444,11 +382,13 @@ You can also say plain digits: `5000`, `five zero zero zero`.
 
 | When | Agent says (Kannada) |
 |------|----------------------|
-| After greeting | ದಯವಿಟ್ಟು ಹೇಳಿ — ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು? |
-| Confirm field | [your value]. ಸರಿಯೇ? ಹೌದು ಅಥವಾ ಮತ್ತೆ ಹೇಳಿ. |
-| Form complete | ಅರ್ಜಿ ಸಿದ್ಧ. ಪ್ರಿಂಟ್ ಮಾಡಬಹುದು. ಮುಗಿಸು ಅಥವಾ ಮುಂದುವರಿಸಿ. |
-| After form / task | ಬೇರೆ ಯಾವುದಾದರೂ ಸಹಾಯ ಬೇಕೇ? ಹೌದು ಎಂದರೆ ಕೇಳಿ, ಮುಗಿಸು ಎಂದರೆ ನಿಲ್ಲಿಸುತ್ತೇವೆ. |
+| After greeting (if spoken) | ದಯವಿಟ್ಟು ಹೇಳಿ — ನಿಮಗೆ ಏನು ಸಹಾಯ ಬೇಕು? |
+| Confirm field | [your value]. … ಹೌದು ಅಥವಾ ಮತ್ತೆ ಹೇಳಿ |
+| Form summary | ನಿಮ್ಮ ಅರ್ಜಿಯ ಸಾರಾಂಶ ಇಲ್ಲಿದೆ. … |
+| Form complete | ಅರ್ಜಿ ಸಿದ್ಧ… ಮುಗಿಸು ಅಥವಾ ಮುಂದುವರಿಸಿ |
 | Could not hear | ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ |
+
+While TTS is loading you may see **Preparing voice** — wait; the subtitle text is already on screen.
 
 ---
 
@@ -457,10 +397,11 @@ You can also say plain digits: `5000`, `five zero zero zero`.
 | Problem | What to do |
 |---------|------------|
 | No sound | Tap screen once; check volume; hard-refresh browser |
-| “API offline” | Start API: `.\scripts\start-kiosk-api.ps1` on port 8000 |
+| “API offline” | Start API: `.\scripts\start-kiosk-api.ps1` on port 8000; TTS box must be ready |
+| Stuck on Preparing | Wait for remote TTS (first phrase can be slow); then Listening |
 | Wrong intent | Speak shorter sentence; use phrases from §2 |
-| Account not recognized | Use demo accounts in §5; speak digits slowly |
-| Bot hears itself | Wait until agent finishes speaking |
+| Account not recognized | Use demo accounts in §5; speak **all 10** digits slowly |
+| Bot hears itself | Wait until agent finishes speaking + green Listening |
 | Form stuck | Say **ಮತ್ತೆ ಹೇಳಿ** or **ಮುಗಿಸು** and start again |
 
 ---
@@ -478,14 +419,16 @@ You can also say plain digits: `5000`, `five zero zero zero`.
 | Account help | `account_info_query` | *(speaks info only)* |
 | Form menu | form_menu route | *(pick from list)* |
 
+Same map is live under **Admin → Conversation flow**.
+
 ---
 
 ## Related docs
 
 - [DEMO_AND_INTERACTION_GUIDE.md](./DEMO_AND_INTERACTION_GUIDE.md) — startup, admin, troubleshooting
-- [VOICE_FORM_UX_PLAN.md](./VOICE_FORM_UX_PLAN.md) — upcoming UI/read-back improvements
 - [DEPLOYMENT.md](./DEPLOYMENT.md) — kiosk + TTS setup
+- [END_TO_END_PROJECT_DOCUMENTATION.md](./END_TO_END_PROJECT_DOCUMENTATION.md) — full system doc
 
 ---
 
-*Last updated: 2026-09-02 · Matches `data/forms.json`, `voiceCommands.ts`, and NLU intents in this repo.*
+*Last updated: 2026-09-10 · Matches agent SpeakGuide, `data/demo_accounts.json` (6 accounts), `data/forms.json`, voice commands, and NLU intents.*

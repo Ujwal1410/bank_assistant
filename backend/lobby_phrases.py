@@ -35,7 +35,13 @@ PREWARM_PHRASES: tuple[str, ...] = (
     ASK_NEED_KN,
     FORM_READY_KN,
     FORM_WHOLE_CONFIRM_KN,
+    FORM_CONFIRM_SUFFIX_KN,
+    FORM_SUMMARY_OPENER_KN,
+    FORM_SUMMARY_CLOSER_KN,
+    "ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ.",
+    "ದಯವಿಟ್ಟು ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ.",
     "ನಿಮ್ಮ ಪೂರ್ಣ ಹೆಸರು ಏನು?",
     "ಖಾತೆ ಸಂಖ್ಯೆ ಹೇಳಿ.",
+    "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ",
     "ಎಷ್ಟು ಮೊತ್ತ?",
 ) + _greet_prewarm_lines()

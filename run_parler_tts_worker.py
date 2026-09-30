@@ -23,6 +23,10 @@ import traceback
 import numpy as np
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", os.environ.get("TRANSFORMERS_OFFLINE", "0"))
+# Triton is often unavailable on Windows CUDA wheels; keep compile off unless opted in.
+os.environ.setdefault("BANK_PARLER_COMPILE", "0")
+os.environ.setdefault("TORCHDYNAMO_DISABLE", "1")
+os.environ.setdefault("TORCH_COMPILE_DISABLE", "1")
 
 from parler_model_utils import max_new_tokens_for_text  # noqa: E402
 

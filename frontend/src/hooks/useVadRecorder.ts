@@ -19,6 +19,8 @@ export interface VadListenOptions {
   maxUtteranceMs?: number;
   /** RMS threshold 0–1-ish (Analyser average / 255). */
   speechThreshold?: number;
+  /** Fired after mic/stream is ready, before VAD wait loop. */
+  onMicReady?: () => void;
 }
 
 const DEFAULTS: Required<VadListenOptions> = {
@@ -149,6 +151,9 @@ export function useVadRecorder() {
           return null;
         }
 
+        cfg.onMicReady?.();
+        setState("listening");
+
         const audioCtx = await getSharedAudioContext();
         if (!audioCtx) {
           throw new Error("Audio not available — tap the screen once, then try again.");
@@ -168,7 +173,6 @@ export function useVadRecorder() {
           if (e.data.size > 0) chunks.push(e.data);
         };
         recorder.start(200);
-        setState("listening");
 
         const startedAt = performance.now();
         let speechStartedAt: number | null = null;
