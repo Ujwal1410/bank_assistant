@@ -20,9 +20,9 @@
       "fields": [
         {
           "id": "account_number",
-          "label_kn": "ಖಾತೆ ಸಂಖ್ಯೆ",
-          "label_en": "Account number",
-          "prompt_kn": "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ",
+          "label_kn": "ಖಾತೆ ಸಂಖ್ಯೆಯ ಕೊನೆಯ 4 ಅಂಕಿಗಳು",
+          "label_en": "Last 4 digits of account number",
+          "prompt_kn": "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯ ಕೊನೆಯ ನಾಲ್ಕು ಅಂಕಿಗಳನ್ನು ಹೇಳಿ",
           "type": "digits",
           "required": true
         }

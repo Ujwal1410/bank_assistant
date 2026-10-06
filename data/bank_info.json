@@ -46,8 +46,8 @@
     "general":          "For account-related queries, please visit your nearest branch with a valid photo identity document.",
     "general_kn":       "ಖಾತೆ ಸಂಬಂಧಿತ ಪ್ರಶ್ನೆಗಳಿಗಾಗಿ, ದಯವಿಟ್ಟು ಫೋಟೋ ಗುರುತಿನ ದಾಖಲೆಯೊಂದಿಗೆ ಹತ್ತಿರದ ಶಾಖೆಗೆ ಭೇಟಿ ನೀಡಿ."
   },
-  "check_balance_note": "Your account balance will be retrieved. Please tell me your 10-digit account number.",
-  "check_balance_note_kn": "ನಿಮ್ಮ ಖಾತೆಯ ಶಿಲ್ಕು ತಿಳಿಯಲು ದಯವಿಟ್ಟು ನಿಮ್ಮ ಹತ್ತು ಅಂಕಿಗಳ ಖಾತೆ ಸಂಖ್ಯೆ ಹೇಳಿ.",
+  "check_balance_note": "Your account balance will be retrieved using the last 4 digits of your account number.",
+  "check_balance_note_kn": "ನಿಮ್ಮ ಖಾತೆಯ ಶಿಲ್ಕು ತಿಳಿಯಲು ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯ ಕೊನೆಯ ನಾಲ್ಕು ಅಂಕಿಗಳನ್ನು ಹೇಳಿ.",
   "form_submitted_kn": "ನಿಮ್ಮ ಅರ್ಜಿಯನ್ನು ಸ್ವೀಕರಿಸಲಾಗಿದೆ. ಮುಂದಿನ ಪ್ರಕ್ರಿಯೆಗಾಗಿ ದಯವಿಟ್ಟು ಹತ್ತಿರದ ಶಾಖೆಗೆ ಭೇಟಿ ನೀಡಿ. ಧನ್ಯವಾದಗಳು.",
   "form_submitted_en": "Your request has been recorded. Please visit the nearest branch to complete the process. Thank you."
 }

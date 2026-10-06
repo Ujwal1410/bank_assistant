@@ -29,8 +29,8 @@ const DEFAULTS: Required<VadListenOptions> = {
   minSpeechMs: 350,
   maxWaitMs: 25000,
   maxUtteranceMs: 18000,
-  // Lower threshold helps quiet laptop mics on Windows (was 0.045)
-  speechThreshold: 0.012,
+  // Very low threshold for quiet laptop mics — RMS values around 0.005 are normal
+  speechThreshold: 0.004,
 };
 
 function pickMimeType(): string | undefined {
@@ -203,8 +203,9 @@ export function useVadRecorder() {
               const avgNoise = noiseFloorSamples > 0
                 ? noiseFloorSum / noiseFloorSamples
                 : cfg.speechThreshold * 0.5;
-              // Use 1.3x average noise as floor (was 2.2x max — too aggressive)
-              noiseFloor = Math.max(cfg.speechThreshold, avgNoise * 1.3);
+              // Use 1.5x average noise as floor — enough to reject silence but
+              // low enough to catch quiet mics (RMS ~0.005 when speaking)
+              noiseFloor = Math.max(cfg.speechThreshold, avgNoise * 1.5);
             }
 
             const threshold = calibrated

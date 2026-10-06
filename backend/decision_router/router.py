@@ -245,7 +245,7 @@ def _build_transactional_response(intent: str, fields: list[str]) -> tuple[str, 
     """
     if intent == "check_balance":
         en = (
-            "To check your balance, please tell me your account number. "
+            "To check your balance, please tell me the last 4 digits of your account number. "
             "I will look it up and tell you the available balance."
         )
         kn = _BANK_INFO.get("check_balance_note_kn", en)

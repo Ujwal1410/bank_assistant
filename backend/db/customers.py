@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -238,7 +239,67 @@ def get_account_balance(account_number: str) -> dict[str, Any] | None:
     return _record_from_demo(acct)
 
 
-def list_customer_loans(customer_id: str) -> list[dict[str, Any]]:
+def get_account_by_last4(last4: str) -> list[dict[str, Any]]:
+    """
+    Find accounts whose account_number ends with the given 4 digits.
+    Returns a list — empty = not found, 1 = unique match, 2+ = ambiguous.
+    """
+    digits = re.sub(r"\D", "", last4 or "")
+    if len(digits) != 4:
+        return []
+    mode = store_mode()
+    if mode == "sqlite":
+        try:
+            init_customer_db()
+            with _connect_sqlite() as conn:
+                count = conn.execute("SELECT COUNT(*) AS n FROM accounts").fetchone()["n"]
+            if count == 0:
+                seed_from_demo()
+            with _connect_sqlite() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT
+                        a.account_number, a.account_type, a.customer_id,
+                        c.full_name AS holder_name,
+                        c.full_name_kn AS holder_name_kn,
+                        b.available_inr AS balance_inr
+                    FROM accounts a
+                    JOIN customers c ON c.id = a.customer_id
+                    JOIN account_balances b ON b.account_id = a.id
+                    WHERE a.account_number LIKE ? AND a.status = 'active' AND c.status = 'active'
+                    """,
+                    (f"%{digits}",),
+                ).fetchall()
+            return [
+                {
+                    "account_number": r["account_number"],
+                    "holder_name": r["holder_name"],
+                    "holder_name_kn": r["holder_name_kn"] or r["holder_name"],
+                    "account_type": r["account_type"],
+                    "balance_inr": float(r["balance_inr"]),
+                    "customer_id": r["customer_id"],
+                    "source": "sqlite",
+                }
+                for r in rows
+            ]
+        except Exception as exc:
+            print(f"[customers] last4 sqlite lookup failed: {exc}", flush=True)
+
+    # JSON fallback
+    demo = _load_demo()
+    return [
+        {
+            "account_number": acct,
+            "holder_name": row.get("holder_name") or "",
+            "holder_name_kn": row.get("holder_name_kn") or row.get("holder_name") or "",
+            "account_type": row.get("account_type") or "Savings",
+            "balance_inr": float(row.get("balance_inr") or 0),
+            "customer_id": None,
+            "source": "json",
+        }
+        for acct, row in demo.items()
+        if acct.endswith(digits)
+    ]
     if store_mode() != "sqlite" or not customer_id:
         return []
     init_customer_db()
