@@ -1030,7 +1030,7 @@ export function HandsFreeConversation({
     onTurnRef.current?.(turn);
   }, [turn]);
 
-  const micPct = Math.min(100, Math.round(micLevel * 400));
+  const micPct = Math.min(100, Math.round(micLevel * 800));
   const form = formSession?.form ?? null;
   const fieldIndex = formSession?.fieldIndex ?? 0;
   const values = formSession?.values ?? {};
@@ -1049,11 +1049,14 @@ export function HandsFreeConversation({
         <span className="handsfree-pulse" aria-hidden />
         <p className="handsfree-status-text">{statusLabel(turn, mode)}</p>
         {hint && <p className="handsfree-hint">{hint}</p>}
-        {vadState === "speech" && <p className="handsfree-hint">ಮಾತನಾಡುತ್ತಿದ್ದೀರಿ…</p>}
+        {vadState === "speech" && <p className="handsfree-hint">ಮಾತನಾಡುತ್ತಿದ್ದೀರಿ… · Talking…</p>}
         {turn === "listening" && (
           <div className="handsfree-mic-meter" aria-hidden>
             <div className="handsfree-mic-fill" style={{ width: `${micPct}%` }} />
           </div>
+        )}
+        {turn === "listening" && (
+          <p className="handsfree-speak-now">🎤 ಈಗ ಮಾತನಾಡಿ · Speak now</p>
         )}
       </div>
 

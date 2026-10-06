@@ -30,7 +30,7 @@ const DEFAULTS: Required<VadListenOptions> = {
   maxWaitMs: 25000,
   maxUtteranceMs: 18000,
   // Lower threshold helps quiet laptop mics on Windows (was 0.045)
-  speechThreshold: 0.016,
+  speechThreshold: 0.012,
 };
 
 function pickMimeType(): string | undefined {
@@ -178,6 +178,9 @@ export function useVadRecorder() {
         let speechStartedAt: number | null = null;
         let lastLoudAt: number | null = null;
         let speaking = false;
+        // Track average noise during calibration (not max — max lets one spike ruin the threshold)
+        let noiseFloorSum = 0;
+        let noiseFloorSamples = 0;
         let noiseFloor = cfg.speechThreshold * 0.5;
         let calibrated = false;
 
@@ -191,14 +194,21 @@ export function useVadRecorder() {
             const level = rmsFromAnalyser(analyser, timeBuf);
             setMicLevel(level);
 
-            if (!calibrated && now - startedAt < 400) {
-              noiseFloor = Math.max(noiseFloor, level);
+            // Calibrate noise floor over first 600ms using AVERAGE (not max)
+            if (!calibrated && now - startedAt < 600) {
+              noiseFloorSum += level;
+              noiseFloorSamples += 1;
             } else if (!calibrated) {
               calibrated = true;
+              const avgNoise = noiseFloorSamples > 0
+                ? noiseFloorSum / noiseFloorSamples
+                : cfg.speechThreshold * 0.5;
+              // Use 1.3x average noise as floor (was 2.2x max — too aggressive)
+              noiseFloor = Math.max(cfg.speechThreshold, avgNoise * 1.3);
             }
 
             const threshold = calibrated
-              ? Math.max(cfg.speechThreshold, noiseFloor * 2.2)
+              ? noiseFloor
               : cfg.speechThreshold;
             const loud = level >= threshold;
 

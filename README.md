@@ -100,8 +100,8 @@ voice-based-assistant/
 │       └── reference_translations.json  # English reference translations
 │
 ├── models/
-│   ├── whisper-medium-ct2/          # Baseline STT model (CTranslate2 int8)
-│   ├── whisper-medium-vaani-ct2/    # Specialized Kannada STT model
+│   ├── whisper-medium-ct2/               # Baseline STT model (CTranslate2 int8)
+│   ├── whisper-kannada-medium-ct2/       # Production Kannada STT model (vasista)
 │   └── nlu-distilbert/              # Fine-tuned DistilBERT + benchmark results
 │
 ├── scripts/
@@ -134,7 +134,7 @@ voice-based-assistant/
 | Module | Model | Size | Notes |
 |--------|-------|------|-------|
 | STT (baseline) | `openai/whisper-medium` | ~400MB int8 | Generic multilingual |
-| STT (specialized) | `ARTPARK-IISc/whisper-medium-vaani-kannada` | ~400MB int8 | Fine-tuned on Kannada VAANI dataset |
+| STT (production) | `vasista22/whisper-kannada-medium` | ~740MB int8 | Fine-tuned on Kannada — stored in `models/whisper-kannada-medium-ct2/` |
 | Translation KN→EN | `ai4bharat/indictrans2-indic-en-dist-200M` | ~800MB | Gated — requires HF auth |
 | Translation EN→KN | `ai4bharat/indictrans2-en-indic-dist-200M` | ~800MB | Gated — requires HF auth |
 | NLU | `distilbert-base-uncased` fine-tuned | ~250MB | Trained on 294 banking sentences |
