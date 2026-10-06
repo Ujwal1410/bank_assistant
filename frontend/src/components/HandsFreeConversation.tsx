@@ -570,10 +570,17 @@ export function HandsFreeConversation({
               setHint(bal.message_kn);
               await playKannadaLine(bal.message_kn);
               if (!bal.found) {
+                // Ambiguous — multiple accounts share last 4 digits — ask for 6
+                const askFor6 = (bal as Record<string, unknown>).ambiguous === true;
                 session = {
                   ...session,
                   fieldIndex: 0,
-                  values: { ...session.values, account_number: "" },
+                  values: {
+                    ...session.values,
+                    account_number: askFor6
+                      ? (acct?.slice(-4) ?? "")  // keep what they said so hint shows it
+                      : "",
+                  },
                   skipFirstFieldPrompt: false,
                 };
                 setSession(session);
@@ -647,7 +654,7 @@ export function HandsFreeConversation({
             if (!still()) return;
 
             try {
-              await submitFormSubmission({
+              const submitResult = await submitFormSubmission({
                 form_id: session.form.id,
                 title_kn: session.form.title_kn,
                 title_en: session.form.title_en,
@@ -655,10 +662,23 @@ export function HandsFreeConversation({
                 kiosk_session_id: kioskSessionRef.current ?? undefined,
               });
               setSubmitWarning(null);
+              // Speak the confirmation to the customer
+              const confirmKn = (submitResult as Record<string, unknown>).confirmation_kn as string | undefined;
+              const confirmEn = (submitResult as Record<string, unknown>).confirmation_en as string | undefined;
+              const confirmText = confirmKn || confirmEn || "ನಿಮ್ಮ ಅರ್ಜಿಯನ್ನು ಸ್ವೀಕರಿಸಲಾಗಿದೆ. ದಯವಿಟ್ಟು ಹತ್ತಿರದ ಶಾಖೆಗೆ ಭೇಟಿ ನೀಡಿ. ಧನ್ಯವಾದಗಳು.";
+              if (still()) {
+                setTurn("speaking");
+                setSubtitle(confirmText);
+                await playKannadaLine(confirmText);
+              }
             } catch {
               setSubmitWarning(
                 "ಅರ್ಜಿಯನ್ನು ಉಳಿಸಲಾಗಲಿಲ್ಲ — ಆದರೂ ಮುದ್ರಿಸಬಹುದು · Save failed, print still works",
               );
+              // Still speak a fallback confirmation
+              if (still()) {
+                await playKannadaLine("ನಿಮ್ಮ ಅರ್ಜಿ ಸಿದ್ಧವಾಗಿದೆ. ದಯವಿಟ್ಟು ಹತ್ತಿರದ ಶಾಖೆಗೆ ಭೇಟಿ ನೀಡಿ.");
+              }
             }
 
             setSession(null);

@@ -328,7 +328,7 @@ export async function submitFormSubmission(payload: {
   title_en: string;
   values: Record<string, string>;
   kiosk_session_id?: string;
-}): Promise<{ ok: boolean; submission: { id: string } }> {
+}): Promise<{ ok: boolean; submission: { id: string }; confirmation_kn?: string; confirmation_en?: string }> {
   const res = await fetchWithTimeout(`${API_BASE}/api/forms/submit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
