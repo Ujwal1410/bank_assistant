@@ -24,9 +24,9 @@ export interface VadListenOptions {
 }
 
 const DEFAULTS: Required<VadListenOptions> = {
-  // Longer end-of-speech wait for natural Kannada speech pauses (was 700ms)
-  silenceMs: 900,
-  minSpeechMs: 350,
+  // Longer end-of-speech wait — 1500ms gives enough time to finish a Kannada sentence
+  silenceMs: 1500,
+  minSpeechMs: 400,
   maxWaitMs: 25000,
   maxUtteranceMs: 18000,
   // Very low threshold for quiet laptop mics — RMS values around 0.005 are normal
@@ -202,10 +202,15 @@ export function useVadRecorder() {
               calibrated = true;
               const avgNoise = noiseFloorSamples > 0
                 ? noiseFloorSum / noiseFloorSamples
-                : cfg.speechThreshold * 0.5;
-              // Use 1.5x average noise as floor — enough to reject silence but
-              // low enough to catch quiet mics (RMS ~0.005 when speaking)
-              noiseFloor = Math.max(cfg.speechThreshold, avgNoise * 1.5);
+                : 0;
+              // Noise floor = avg background + small margin
+              // Cap at 0.006 so quiet mics (RMS 0.005 when speaking) still trigger
+              const computed = avgNoise * 1.2;
+              noiseFloor = Math.min(
+                Math.max(cfg.speechThreshold, computed),
+                0.006   // hard cap — never block speech on quiet mics
+              );
+              console.log(`[VAD] calibrated: avgNoise=${avgNoise.toFixed(5)} computed=${computed.toFixed(5)} noiseFloor=${noiseFloor.toFixed(5)}`);
             }
 
             const threshold = calibrated

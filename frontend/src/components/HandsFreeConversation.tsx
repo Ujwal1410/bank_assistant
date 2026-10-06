@@ -923,7 +923,7 @@ export function HandsFreeConversation({
             blob,
             `lobby.${ext}`,
             pipelineContext(),
-            { includeAudio: false },
+            { includeAudio: true },
           );
           if (!still()) return;
 
