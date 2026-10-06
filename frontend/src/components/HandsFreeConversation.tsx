@@ -905,6 +905,12 @@ export function HandsFreeConversation({
             await playKannada("ದಯವಿಟ್ಟು ಮತ್ತೆ ಹೇಳಿ");
             emptyListenCount = 0;
           }
+          // After 8 empty listens (~3 min of silence) — end session automatically
+          if (emptyListenCount >= 8) {
+            await playKannada("ಯಾವುದೇ ಪ್ರತಿಕ್ರಿಯೆ ಇಲ್ಲ. ಸೆಷನ್ ಮುಗಿಸಲಾಗುತ್ತಿದೆ. ಧನ್ಯವಾದಗಳು.");
+            onEndRef.current("Auto-ended: no speech detected for extended period");
+            return;
+          }
           continue;
         }
         emptyListenCount = 0;
