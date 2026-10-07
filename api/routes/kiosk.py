@@ -50,13 +50,30 @@ def _current_speaker() -> str:
     return get_tts_speaker()
 
 
+def _cloud_voice_tag() -> str | None:
+    """File tag for greetings spoken by a Sarvam voice (None = local Parler voice)."""
+    try:
+        from backend.tts import cloud_tts_profile
+
+        profile = cloud_tts_profile()
+    except Exception:
+        return None
+    if not profile:
+        return None
+    return "sarvam-" + profile.rsplit("|", 1)[-1]
+
+
+def _voice_tag() -> str:
+    return _cloud_voice_tag() or _current_speaker()
+
+
 def _cache_path(slot: str, variant: int, speaker: str | None = None) -> str:
-    selected = speaker or _current_speaker()
+    selected = speaker or _voice_tag()
     return os.path.join(GREET_DIR, f"{slot}_{variant}_{selected.lower()}.wav")
 
 
 def _read_cache(slot: str, variant: int) -> str | None:
-    speaker = _current_speaker()
+    speaker = _voice_tag()
     paths = [_cache_path(slot, variant, speaker)]
     # Existing unlabelled greeting files were generated with the Suresh default.
     if speaker == "Suresh":
@@ -91,8 +108,9 @@ def _generate_variant(slot: str, variant: int) -> dict:
     greet = pick_greeting(slot=slot, variant=variant)  # type: ignore[arg-type]
     line_kn = greet.get("line_kn") or ""
     speaker = _current_speaker()
+    cloud_tag = _cloud_voice_tag()
 
-    if remote_tts_configured() and line_kn.strip():
+    if (remote_tts_configured() or cloud_tag) and line_kn.strip():
         try:
             from backend.tts.speak_cache import kannada_to_b64
 
@@ -100,7 +118,9 @@ def _generate_variant(slot: str, variant: int) -> dict:
             if audio_b64:
                 try:
                     os.makedirs(GREET_DIR, exist_ok=True)
-                    with open(_cache_path(slot, variant, speaker), "wb") as f:
+                    # Re-check: if Sarvam failed just now, this clip is the local voice.
+                    saved_tag = _cloud_voice_tag() if cloud_tag else None
+                    with open(_cache_path(slot, variant, saved_tag or speaker), "wb") as f:
                         f.write(base64.b64decode(audio_b64))
                 except OSError:
                     pass

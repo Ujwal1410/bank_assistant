@@ -935,6 +935,84 @@ export async function fetchAdminConversationFlow(): Promise<ConversationFlowData
   return res.json();
 }
 
+export type CloudStage = "stt" | "translation" | "tts";
+export type CloudProvider = "local" | "sarvam";
+
+export interface CloudStageStatus {
+  provider: CloudProvider;
+  ok: boolean | null;
+  at: string | null;
+  ms: number | null;
+  error_kind: string | null;
+  error: string | null;
+  /** Sarvam is selected but the local model is answering (no key, credits, or outage). */
+  using_local_now: boolean;
+}
+
+export interface CloudSettings {
+  provider_name: string;
+  stages: Record<CloudStage, CloudStageStatus>;
+  sarvam_voice: string;
+  voices: string[];
+  fallback_local: boolean;
+  key_set: boolean;
+  key_hint: string;
+  key_source: "settings" | "env" | "none";
+}
+
+export interface CloudSettingsUpdate {
+  stt?: CloudProvider;
+  translation?: CloudProvider;
+  tts?: CloudProvider;
+  sarvam_voice?: string;
+  fallback_local?: boolean;
+  /** "" removes the saved key. */
+  sarvam_api_key?: string;
+}
+
+export interface CloudTestResult {
+  ok: boolean;
+  kind: string | null;
+  message: string;
+  translation?: string;
+  audio_b64?: string;
+}
+
+export async function fetchCloudSettings(): Promise<CloudSettings> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/settings/cloud`, {
+    headers: adminAuthHeaders(),
+    timeoutMs: 10000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Could not load speech engine settings"));
+  return res.json();
+}
+
+export async function updateCloudSettings(changes: CloudSettingsUpdate): Promise<CloudSettings> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/settings/cloud`, {
+    method: "PUT",
+    headers: { ...adminAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+    timeoutMs: 15000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Could not save speech engine settings"));
+  return res.json();
+}
+
+/** Translate + speak one phrase with Sarvam. Pass a key to test it before saving. */
+export async function testCloudKey(body: { sarvam_api_key?: string; sarvam_voice?: string } = {}): Promise<CloudTestResult> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/admin/settings/cloud/test`, {
+    method: "POST",
+    headers: { ...adminAuthHeaders(), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    timeoutMs: 60000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Key test failed"));
+  return res.json();
+}
+
 export interface SystemHealth {
   status: string;
   pipeline_worker?: boolean;

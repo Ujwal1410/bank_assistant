@@ -10,6 +10,7 @@ import {
 } from "../../api/client";
 import { unlockAudio } from "../../utils/playAudio";
 import { Badge, Card, ErrorNote, Icon, Loading } from "./shared";
+import { SpeechEngines } from "./SpeechEngines";
 
 const PREVIEW_TEXT = "ನಮಸ್ಕಾರ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?";
 
@@ -129,6 +130,8 @@ export function Settings({ apiOnline, username, onSignOut }: SettingsProps) {
           </div>
         )}
       </Card>
+
+      <SpeechEngines apiOnline={apiOnline} />
 
       <div className="ac-grid ac-grid--2">
         <Card title="System" titleKn="ವ್ಯವಸ್ಥೆ">

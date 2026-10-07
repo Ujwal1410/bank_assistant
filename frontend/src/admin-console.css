@@ -1414,6 +1414,157 @@
   overflow-wrap: anywhere;
 }
 
+/* Speech engines (open-source vs Sarvam) */
+
+.ac-engines {
+  list-style: none;
+  margin: 1rem 0 1.25rem;
+  padding: 0;
+  border: 1px solid var(--ac-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.ac-engine {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) auto minmax(200px, 1.2fr);
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  padding: 0.85rem 1.1rem;
+  background: var(--ac-surface);
+}
+
+.ac-engine + .ac-engine {
+  border-top: 1px solid var(--ac-border);
+}
+
+.ac-engine-name {
+  display: grid;
+  gap: 0.1rem;
+}
+
+.ac-engine-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.ac-engine-error {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 0.82rem;
+  color: #991b1b;
+  overflow-wrap: anywhere;
+}
+
+.ac-seg {
+  display: inline-flex;
+  padding: 3px;
+  border-radius: 10px;
+  background: #eef2f7;
+  border: 1px solid var(--ac-border);
+}
+
+.ac-seg button {
+  border: 0;
+  background: transparent;
+  padding: 0.4rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ac-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ac-seg button.is-on {
+  background: var(--ac-navy);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(11, 35, 64, 0.25);
+}
+
+.ac-seg button:disabled {
+  cursor: wait;
+}
+
+.ac-seg button:focus-visible,
+.ac-key-row input:focus-visible,
+.ac-key-row select:focus-visible {
+  outline: 2px solid var(--ac-blue);
+  outline-offset: 2px;
+}
+
+.ac-engine-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ac-engine-box {
+  display: grid;
+  align-content: start;
+  gap: 0.6rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid var(--ac-border);
+  background: var(--ac-soft);
+}
+
+.ac-engine-box h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.ac-engine-box p {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.ac-key-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ac-key-row input,
+.ac-key-row select {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ac-text);
+  font-size: 0.9rem;
+}
+
+.ac-key-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.ac-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-size: 0.86rem;
+  line-height: 1.45;
+  cursor: pointer;
+}
+
+.ac-check input {
+  margin-top: 0.2rem;
+  accent-color: var(--ac-navy);
+}
+
+.ac-engine-foot {
+  margin: 1rem 0 0;
+  font-size: 0.86rem;
+}
+
 /* ── Guide ─────────────────────────────────────────────────────────────── */
 
 .ac-tips {
@@ -1633,6 +1784,10 @@
 }
 
 @media (max-width: 1100px) {
+  .ac-engine-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .ac-grid--2-1,
   .ac-grid--2 {
     grid-template-columns: minmax(0, 1fr);
@@ -1707,6 +1862,24 @@
 }
 
 @media (max-width: 720px) {
+  .ac-engine {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.55rem;
+  }
+
+  .ac-seg {
+    justify-self: start;
+  }
+
+  .ac-key-row {
+    flex-wrap: wrap;
+  }
+
+  .ac-key-row input,
+  .ac-key-row select {
+    flex-basis: 100%;
+  }
+
   .ac-kpis,
   .ac-kpis--4 {
     grid-template-columns: repeat(2, minmax(0, 1fr));

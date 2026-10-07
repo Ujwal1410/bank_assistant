@@ -139,6 +139,13 @@ def transcribe(
         If the model directory has not been created yet.
         Run ``python backend/stt/convert_models.py --model vasista-medium`` first.
     """
+    # Sarvam cloud STT when staff selected it in the admin console. The explicit
+    # ``model`` argument (benchmarks) always means the local model.
+    if model is None:
+        cloud_text = _transcribe_cloud(audio_path, language)
+        if cloud_text is not None:
+            return cloud_text
+
     selected = warm_model(model)
 
     field_hints: dict[str, str] = {}
@@ -153,6 +160,39 @@ def transcribe(
         beam_size=beam_size,
         **field_hints,
     )
+
+
+def _transcribe_cloud(audio_path: str, language: str) -> str | None:
+    """Sarvam transcript, or None to use the local model (not selected / failed)."""
+    from backend import cloud
+
+    if not cloud.cloud_selected("stt"):
+        return None
+    if not cloud.use_cloud("stt"):
+        if cloud.fallback_allowed():
+            return None
+        raise cloud.unavailable_error("speech-to-text")
+
+    import soundfile as sf
+
+    from backend.stt.utils import is_silent, validate_audio_file
+
+    validate_audio_file(audio_path)
+    audio_array, _sr = sf.read(audio_path, dtype="float32", always_2d=False)
+    if is_silent(audio_array):
+        return ""  # never spend credits on silence
+
+    from backend.cloud import sarvam
+
+    try:
+        return cloud.call_cloud(
+            "stt",
+            lambda key: sarvam.transcribe(key, audio_path, language=language),
+        )
+    except Exception:
+        if cloud.fallback_allowed():
+            return None
+        raise
 
 
 def unload_model(model: ModelName | Literal["all"] | None = None) -> None:

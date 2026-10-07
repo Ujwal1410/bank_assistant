@@ -19,6 +19,7 @@ data/stt_test_audio/*.wav
 data/tts_output/
 data/tts_cache/
 data/runtime_settings.json
+data/cloud_status.json
 data/logs/
 data/history.db
 data/customer_banking.db

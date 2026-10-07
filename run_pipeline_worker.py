@@ -166,13 +166,11 @@ def _free_vram_for_tts() -> None:
 
 
 def _speak(text: str) -> dict:
-    from backend.tts.speak_cache import get_cached_b64, kannada_to_b64
+    from backend.tts.speak_cache import kannada_to_b64
 
     cleaned = text.strip()
-    hit = get_cached_b64(cleaned)
-    if hit:
-        return {"ok": True, "audio_b64": hit, "text": cleaned}
-
+    # kannada_to_b64 checks the cache (for the selected voice / provider) before
+    # freeing any VRAM, so cached phrases stay instant.
     b64 = kannada_to_b64(cleaned, free_vram=_free_vram_for_tts)
     if not b64:
         return {"ok": False, "error": "TTS returned empty audio", "audio_b64": ""}
