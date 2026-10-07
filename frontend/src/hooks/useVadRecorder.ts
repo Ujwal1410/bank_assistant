@@ -216,17 +216,26 @@ export function useVadRecorder() {
             const threshold = calibrated
               ? noiseFloor
               : cfg.speechThreshold;
-            const loud = level >= threshold;
+
+            // HYSTERESIS: use higher threshold to START speech, lower to SUSTAIN
+            // This prevents ambient noise from keeping lastLoudAt alive after speech ends.
+            // startThreshold: must be clearly above noise to trigger speech
+            // sustainThreshold: once speaking, only update lastLoudAt if still clearly audible
+            const startThreshold = threshold;
+            const sustainThreshold = threshold * 2.5; // 2.5x — clearly above noise
+
+            const loudToStart = level >= startThreshold;
+            const loudToSustain = level >= sustainThreshold;
 
             if (!speaking) {
-              if (loud) {
+              if (loudToStart) {
                 speaking = true;
                 speechStartedAt = now;
                 lastLoudAt = now;
                 setState("speech");
-                console.log(`[VAD] speech started, threshold=${threshold.toFixed(5)}, level=${level.toFixed(5)}`);
+                console.log(`[VAD] speech started level=${level.toFixed(5)} startThreshold=${startThreshold.toFixed(5)} sustainThreshold=${sustainThreshold.toFixed(5)}`);
               } else if (now - startedAt > cfg.maxWaitMs) {
-                console.log(`[VAD] maxWaitMs exceeded — no speech`);
+                console.log(`[VAD] maxWaitMs exceeded — no speech detected`);
                 if (recorder && recorder.state !== "inactive") {
                   recorder.onstop = () => resolve(null);
                   recorder.stop();
@@ -236,12 +245,19 @@ export function useVadRecorder() {
                 return;
               }
             } else {
-              if (loud) lastLoudAt = now;
+              // Only extend lastLoudAt if clearly louder than noise (sustainThreshold)
+              if (loudToSustain) lastLoudAt = now;
               const speechMs = now - (speechStartedAt ?? now);
               const silenceMs = now - (lastLoudAt ?? now);
               const hitMax = speechMs >= cfg.maxUtteranceMs;
               const hitEnd =
                 speechMs >= cfg.minSpeechMs && silenceMs >= cfg.silenceMs;
+
+              // Log every 500ms while speaking so we can see silence accumulating
+              if (Math.floor(speechMs / 500) !== Math.floor((speechMs - 16) / 500)) {
+                console.log(`[VAD] speaking: speechMs=${speechMs.toFixed(0)} silenceMs=${silenceMs.toFixed(0)} level=${level.toFixed(5)} loud=${loudToSustain}`);
+              }
+
               if (hitMax || hitEnd) {
                 console.log(`[VAD] done: speechMs=${speechMs.toFixed(0)} silenceMs=${silenceMs.toFixed(0)} hitEnd=${hitEnd} hitMax=${hitMax}`);
                 setState("processing_local");
