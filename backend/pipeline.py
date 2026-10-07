@@ -159,7 +159,7 @@ def run_pipeline(
     _unload_stt = None
     try:
         from backend.stt import transcribe, unload_model as _unload_stt
-        result.kannada_text = transcribe(audio_path, beam_size=1)
+        result.kannada_text = transcribe(audio_path, beam_size=3)
     except Exception as exc:
         result.error = "STT failed: " + str(exc)
         result.total_time_s = round(time.perf_counter() - t_total, 2)
