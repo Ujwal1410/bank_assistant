@@ -549,6 +549,9 @@ _CLIP_EXPECTATIONS: dict[str, dict] = {
     },
     "clip_004.wav": {
         "intent": "open_account",
+        # Direct form shortcut: "open account" jumps straight into the form.
+        "also_intent": ("form_select",),
+        "form_id": "open_account",
         "route": "transactional",
         "kn_in_response": "ಖಾತೆ",
     },
@@ -593,9 +596,14 @@ def test_pipeline_audio(api: str) -> None:
             audio_b64 = result.get("audio_b64") or ""
 
             _result(f"{clip} — no error", not err, err or "")
+            accepted = (expected["intent"], *expected.get("also_intent", ()))
             _result(f"{clip} — intent={expected['intent']}",
-                    intent == expected["intent"],
+                    intent in accepted,
                     f"got={intent} ({elapsed:.1f}s)")
+            if expected.get("form_id"):
+                _result(f"{clip} — form_id={expected['form_id']}",
+                        result.get("form_id") == expected["form_id"],
+                        f"got={result.get('form_id')}")
             _result(f"{clip} — route={expected['route']}",
                     route_val == expected["route"],
                     f"got={route_val}")
@@ -663,14 +671,26 @@ def test_form_submission_confirmation(api: str) -> None:
     telling them to visit the branch.
     """
     print("\n── Form Submit Confirmation ──")
+    today = time.strftime("%d/%m/%Y")
     form_cases = [
         {
             "form_id": "cash_withdrawal",
-            "values": {"account_number": "1234567890", "amount": "5000"},
+            "values": {
+                "full_name": "Ramesh Kumar",
+                "account_number": "1234567890",
+                "amount": "5000",
+                "date": today,
+            },
         },
         {
             "form_id": "cash_deposit",
-            "values": {"account_number": "1234567890", "amount": "2000"},
+            "values": {
+                "full_name": "Ramesh Kumar",
+                "account_number": "1234567890",
+                "amount": "2000",
+                "deposit_mode": "Cash",
+                "date": today,
+            },
         },
     ]
     for case in form_cases:

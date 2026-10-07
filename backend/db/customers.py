@@ -79,7 +79,9 @@ def init_customer_db() -> str:
 def seed_from_demo(*, force: bool = False) -> dict[str, int]:
     """
     Seed customers/accounts/balances from demo_accounts.json into sqlite store.
-    Safe to call repeatedly; skips when accounts already exist unless force=True.
+    Safe to call repeatedly: without force=True, only demo accounts missing from
+    the DB are inserted (existing rows and balances are left untouched), so
+    accounts added to demo_accounts.json later still reach an existing DB.
     """
     init_customer_db()
     if store_mode() != "sqlite":
@@ -87,20 +89,26 @@ def seed_from_demo(*, force: bool = False) -> dict[str, int]:
 
     demo = _load_demo()
     with _connect_sqlite() as conn:
-        existing = conn.execute("SELECT COUNT(*) AS n FROM accounts").fetchone()["n"]
-        if existing and not force:
-            return {"customers": 0, "accounts": int(existing), "skipped": 1}
-
         if force:
             conn.execute("DELETE FROM balance_audit")
             conn.execute("DELETE FROM account_balances")
             conn.execute("DELETE FROM loans")
             conn.execute("DELETE FROM accounts")
             conn.execute("DELETE FROM customers")
+            present: set[str] = set()
+        else:
+            present = {
+                r["account_number"]
+                for r in conn.execute("SELECT account_number FROM accounts")
+            }
+
+        pending = {num: row for num, row in demo.items() if num not in present}
+        if not pending:
+            return {"customers": 0, "accounts": len(present), "skipped": 1}
 
         customers = 0
         accounts = 0
-        for account_number, row in demo.items():
+        for account_number, row in pending.items():
             customer_id = str(uuid.uuid4())
             account_id = str(uuid.uuid4())
             created = _now()

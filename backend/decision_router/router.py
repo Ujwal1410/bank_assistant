@@ -31,6 +31,7 @@ import json
 import os
 
 from backend.decision_router.exceptions import RouterError
+from backend.nlu.kannada_keywords import REPAYMENT_TERMS
 
 # ---------------------------------------------------------------------------
 # Load bank_info.json once at import time
@@ -145,7 +146,9 @@ def _detect_rate_product(query: str) -> str | None:
 # Response text builders (private)
 # ---------------------------------------------------------------------------
 
-def _build_interest_rate_response(query_text: str = "") -> tuple[str, str]:
+def _build_interest_rate_response(
+    query_text: str = "", kannada_text: str = ""
+) -> tuple[str, str]:
     """
     Return (english, kannada) interest rate response.
 
@@ -156,6 +159,12 @@ def _build_interest_rate_response(query_text: str = "") -> tuple[str, str]:
     rates_kn = _BANK_INFO.get("interest_rates_kn", {})
     loan_info = _BANK_INFO["loan_repayment"]["info"]
     loan_info_kn = _BANK_INFO["loan_repayment"].get("info_kn", loan_info)
+
+    # Repayment question — answer just that, not the full rate list (which is
+    # also ~4x longer to speak on the TTS box).
+    asked = f"{query_text} {kannada_text}".lower()
+    if any(term in asked for term in REPAYMENT_TERMS):
+        return loan_info, loan_info_kn
 
     product = _detect_rate_product(query_text)
 
@@ -353,7 +362,7 @@ def route(intent: str, query_text: str = "", kannada_text: str = "") -> dict:
 
     if intent in INFORMATIONAL_INTENTS:
         if intent == "interest_rate_query":
-            en, kn = _build_interest_rate_response(query_text)
+            en, kn = _build_interest_rate_response(query_text, kannada_text)
         else:
             # account_info_query — pass both English and Kannada for matching
             en, kn = _build_account_info_response(query_text, kannada_text)

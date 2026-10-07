@@ -227,6 +227,8 @@ class KannadaTranscriber:
 
         # Segments are a lazy generator — iterate to materialise them
         text = " ".join(seg.text.strip() for seg in segments).strip()
+        # A decode that stops mid-character leaves U+FFFD — never pass it on to NLU/forms.
+        text = text.replace("�", "").strip()
 
         self.last_inference_time_s = time.perf_counter() - t_start
 

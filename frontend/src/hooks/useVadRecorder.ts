@@ -23,7 +23,7 @@ export interface VadListenOptions {
   onMicReady?: () => void;
 }
 
-const DEFAULTS: Required<VadListenOptions> = {
+const DEFAULTS: Required<Omit<VadListenOptions, "onMicReady">> = {
   // Longer end-of-speech wait — 1500ms gives enough time to finish a Kannada sentence
   silenceMs: 1500,
   minSpeechMs: 400,
