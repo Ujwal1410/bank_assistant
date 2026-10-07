@@ -1076,6 +1076,9 @@ export function HandsFreeConversation({
         <p className="handsfree-status-text">{statusLabel(turn, mode)}</p>
         {hint && <p className="handsfree-hint">{hint}</p>}
         {vadState === "speech" && <p className="handsfree-hint">ಮಾತನಾಡುತ್ತಿದ್ದೀರಿ… · Talking…</p>}
+        {vadState === "processing_local" && (
+          <p className="handsfree-hint handsfree-hint--got-it">✓ ಕೇಳಿದೆ — ಪ್ರಕ್ರಿಯೆ ನಡೆಯುತ್ತಿದೆ… · Got it — processing…</p>
+        )}
         {turn === "listening" && (
           <div className="handsfree-mic-meter" aria-hidden>
             <div className="handsfree-mic-fill" style={{ width: `${micPct}%` }} />

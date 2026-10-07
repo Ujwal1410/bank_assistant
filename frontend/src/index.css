@@ -2413,6 +2413,16 @@ body:has(.lobby-shell),
   animation: speak-now-pulse 1.2s ease-in-out infinite;
 }
 
+.handsfree-hint--got-it {
+  color: #1d4ed8;
+  font-weight: 600;
+  background: #eff6ff;
+  border: 1px solid #93c5fd;
+  border-radius: 8px;
+  padding: 0.4rem 0.75rem;
+  margin-top: 0.4rem;
+}
+
 @keyframes speak-now-pulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50%      { transform: scale(1.03); opacity: 0.9; }

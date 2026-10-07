@@ -224,7 +224,9 @@ export function useVadRecorder() {
                 speechStartedAt = now;
                 lastLoudAt = now;
                 setState("speech");
+                console.log(`[VAD] speech started, threshold=${threshold.toFixed(5)}, level=${level.toFixed(5)}`);
               } else if (now - startedAt > cfg.maxWaitMs) {
+                console.log(`[VAD] maxWaitMs exceeded — no speech`);
                 if (recorder && recorder.state !== "inactive") {
                   recorder.onstop = () => resolve(null);
                   recorder.stop();
@@ -241,6 +243,7 @@ export function useVadRecorder() {
               const hitEnd =
                 speechMs >= cfg.minSpeechMs && silenceMs >= cfg.silenceMs;
               if (hitMax || hitEnd) {
+                console.log(`[VAD] done: speechMs=${speechMs.toFixed(0)} silenceMs=${silenceMs.toFixed(0)} hitEnd=${hitEnd} hitMax=${hitMax}`);
                 setState("processing_local");
                 if (recorder && recorder.state !== "inactive") {
                   recorder.onstop = () => {
