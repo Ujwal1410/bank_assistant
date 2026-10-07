@@ -76,6 +76,15 @@ KANNADA_INTENT_KEYWORDS: dict[str, tuple[str, ...]] = {
         "atm card",
         "pin change",
         "mobile update",
+        # Kannada forms — "ಚೆಕ್ ಬುಕ್ ಬೇಕು" was routed to apply_loan.
+        "ಚೆಕ್ ಬುಕ್",
+        "ಚೆಕ್ಬುಕ್",
+        "ಚೆಕ್ ಪುಸ್ತಕ",
+        "ಬುಕ್ ಬೇಕು",  # STT often drops "ಚೆಕ್"/"ಪಾಸ್" -> still a book request
+        "ಪಾಸ್ ಬುಕ್",
+        "ಪಾಸ್‌ಬುಕ್",
+        "ಪಿನ್",
+        "ಎಟಿಎಂ",
     ),
 }
 
