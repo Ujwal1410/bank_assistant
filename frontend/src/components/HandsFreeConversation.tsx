@@ -607,34 +607,64 @@ export function HandsFreeConversation({
             await playKannadaLine(summary.confirm_prompt_kn || FORM_WHOLE_CONFIRM_KN);
             if (!still()) return;
 
-            setHint("ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ · Say yes or no");
-            const confirmBlob = await listenForSpeech({ silenceMs: 1200, minSpeechMs: 350 });
-            if (!still()) return;
-            if (!confirmBlob) {
-              setHint("ದಯವಿಟ್ಟು ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ");
-              continue;
+            // Local retry loop for yes/no — do NOT replay the whole summary on
+            // an unrecognized answer. Only re-ask "yes or no" and listen again.
+            // After 3 failed attempts, restart from the first field to avoid
+            // getting stuck forever on noisy/garbled input.
+            let confirmed = false;
+            let restartForm = false;
+            let confirmAttempts = 0;
+            const MAX_CONFIRM_ATTEMPTS = 3;
+
+            while (still() && !confirmed && confirmAttempts < MAX_CONFIRM_ATTEMPTS) {
+              confirmAttempts += 1;
+              setHint("ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ · Say yes or no");
+              const confirmBlob = await listenForSpeech({ silenceMs: 1200, minSpeechMs: 350 });
+              if (!still()) return;
+              if (!confirmBlob) {
+                setHint("ದಯವಿಟ್ಟು ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ");
+                continue;
+              }
+
+              setTurn("thinking");
+              const confirmExt = confirmBlob.type.includes("ogg") ? "ogg" : "webm";
+              const confirmFill = await fillFormFieldAudio(
+                confirmBlob,
+                "text",
+                "confirm",
+                `whole-confirm.${confirmExt}`,
+              );
+              if (!still()) return;
+
+              const parts = [
+                confirmFill.kannada_text,
+                confirmFill.english_text,
+                confirmFill.value,
+              ];
+              if (isEndSessionCommand(...parts)) {
+                onEndRef.current("Customer ended during form summary");
+                return;
+              }
+              if (isRejectCommand(...parts)) {
+                restartForm = true;
+                break;
+              }
+              if (isAffirmCommand(...parts)) {
+                confirmed = true;
+                break;
+              }
+              // Unrecognized — re-ask yes/no, do NOT replay the summary
+              setTurn("form_summary_confirm");
+              setHint("ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಮಾತ್ರ ಹೇಳಿ · Please say only yes or no");
+              if (confirmAttempts < MAX_CONFIRM_ATTEMPTS) {
+                await playKannada("ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ");
+                if (!still()) return;
+              }
             }
 
-            setTurn("thinking");
-            const confirmExt = confirmBlob.type.includes("ogg") ? "ogg" : "webm";
-            const confirmFill = await fillFormFieldAudio(
-              confirmBlob,
-              "text",
-              "confirm",
-              `whole-confirm.${confirmExt}`,
-            );
             if (!still()) return;
 
-            const parts = [
-              confirmFill.kannada_text,
-              confirmFill.english_text,
-              confirmFill.value,
-            ];
-            if (isEndSessionCommand(...parts)) {
-              onEndRef.current("Customer ended during form summary");
-              return;
-            }
-            if (isRejectCommand(...parts)) {
+            if (restartForm) {
               setHint("ಮೊದಲ ಪ್ರಶ್ನೆಯಿಂದ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸೋಣ");
               session = { ...session, fieldIndex: 0 };
               setSession(session);
@@ -643,8 +673,18 @@ export function HandsFreeConversation({
               setError(null);
               continue;
             }
-            if (!isAffirmCommand(...parts)) {
-              setHint("ದಯವಿಟ್ಟು ಹೌದು ಅಥವಾ ಇಲ್ಲ ಎಂದು ಹೇಳಿ");
+
+            if (!confirmed) {
+              // Gave up after MAX_CONFIRM_ATTEMPTS — restart from first field
+              // rather than looping forever on noisy input.
+              setHint("ಅರ್ಥವಾಗಲಿಲ್ಲ — ಮೊದಲ ಪ್ರಶ್ನೆಯಿಂದ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸೋಣ");
+              await playKannada("ಅರ್ಥವಾಗಲಿಲ್ಲ. ಮೊದಲ ಪ್ರಶ್ನೆಯಿಂದ ಮತ್ತೆ ಪ್ರಾರಂಭಿಸೋಣ.");
+              if (!still()) return;
+              session = { ...session, fieldIndex: 0 };
+              setSession(session);
+              setSummaryLines([]);
+              setDraft("");
+              setError(null);
               continue;
             }
 
