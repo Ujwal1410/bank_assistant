@@ -136,6 +136,11 @@ def translate(
     # --- Validate direction (raises TranslationInputError if unsupported) ---
     validate_direction(src_lang, tgt_lang)
 
+    # --- Sarvam cloud translation when selected in the admin console ---
+    cloud_text = _translate_cloud(text, src_lang, tgt_lang)
+    if cloud_text is not None:
+        return cloud_text
+
     # --- Lazy-load the correct model for this direction ---
     model_id = MODEL_IDS[(src_lang, tgt_lang)]
 
@@ -145,6 +150,31 @@ def translate(
 
     # --- Translate and return the single string ---
     return _model_cache[model_id].translate([text], src_lang, tgt_lang)[0]
+
+
+def _translate_cloud(text: str, src_lang: str, tgt_lang: str) -> str | None:
+    """Sarvam translation, or None to use the local model (not selected / failed)."""
+    from backend import cloud
+
+    if not cloud.cloud_selected("translation"):
+        return None
+    if not cloud.use_cloud("translation"):
+        if cloud.fallback_allowed():
+            return None
+        raise cloud.unavailable_error("translation")
+
+    from backend.cloud import sarvam
+
+    try:
+        result = cloud.call_cloud(
+            "translation",
+            lambda key: sarvam.translate(key, text, src_lang=src_lang, tgt_lang=tgt_lang),
+        )
+    except Exception:
+        if cloud.fallback_allowed():
+            return None
+        raise
+    return result or None
 
 
 def translate_kn_to_en(text: str) -> str:

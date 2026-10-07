@@ -11,13 +11,18 @@ def test_voice_setting_persists_atomically(tmp_path, monkeypatch) -> None:
     from api import app_settings
 
     settings_path = tmp_path / "runtime_settings.json"
-    monkeypatch.setattr(app_settings, "_SETTINGS_PATH", str(settings_path))
+    settings_path.write_text(json.dumps({"cloud": {"stt": "sarvam"}}), encoding="utf-8")
+    monkeypatch.setenv("BANK_RUNTIME_SETTINGS_FILE", str(settings_path))
     previous = app_settings.get_tts_speaker()
 
     try:
         assert app_settings.set_tts_speaker("anu") == "Anu"
         assert app_settings.get_tts_speaker() == "Anu"
-        assert json.loads(settings_path.read_text(encoding="utf-8")) == {"speaker": "Anu"}
+        # Other settings in the file (cloud providers) must survive a voice change.
+        assert json.loads(settings_path.read_text(encoding="utf-8")) == {
+            "cloud": {"stt": "sarvam"},
+            "speaker": "Anu",
+        }
     finally:
         app_settings.set_tts_speaker(previous)
 

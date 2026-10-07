@@ -73,6 +73,99 @@ def set_voice_settings(
     return {"ok": True, "speaker": speaker}
 
 
+class CloudSettingsBody(BaseModel):
+    stt: str | None = Field(None, max_length=16)
+    translation: str | None = Field(None, max_length=16)
+    tts: str | None = Field(None, max_length=16)
+    sarvam_voice: str | None = Field(None, max_length=32)
+    fallback_local: bool | None = None
+    # "" removes the saved key (falls back to SARVAM_API_KEY in .env, if any).
+    sarvam_api_key: str | None = Field(None, max_length=256)
+
+
+class CloudTestBody(BaseModel):
+    # Test a key before saving it; omit to test the saved key.
+    sarvam_api_key: str | None = Field(None, max_length=256)
+    sarvam_voice: str | None = Field(None, max_length=32)
+
+
+_CLOUD_TEST_KN = "ನಮಸ್ಕಾರ. ನಾನು ನಿಮಗೆ ಹೇಗೆ ಸಹಾಯ ಮಾಡಬಹುದು?"
+
+
+@router.get("/admin/settings/cloud")
+def get_cloud_settings(_admin: dict = Depends(admin_auth.require_admin)) -> dict:
+    from backend import cloud
+
+    return cloud.public_config()
+
+
+@router.put("/admin/settings/cloud")
+def set_cloud_settings(
+    body: CloudSettingsBody,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
+    from backend import cloud
+
+    try:
+        cloud.save_config(body.model_dump(exclude_none=True))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"ok": True, **cloud.public_config()}
+
+
+@router.post("/admin/settings/cloud/test")
+def test_cloud_settings(
+    body: CloudTestBody,
+    _admin: dict = Depends(admin_auth.require_admin),
+) -> dict:
+    """Translate and speak one short phrase with Sarvam (uses a few credits)."""
+    import base64
+    import io
+    import time
+
+    import soundfile as sf
+
+    from backend import cloud
+    from backend.cloud import sarvam
+
+    candidate = (body.sarvam_api_key or "").strip()
+    key = candidate or cloud.api_key()
+    if not key:
+        return {"ok": False, "kind": "auth", "message": "No Sarvam API key is set yet."}
+    voice = (body.sarvam_voice or cloud.get_config()["sarvam_voice"]).strip().lower()
+    if voice not in sarvam.TTS_VOICES:
+        raise HTTPException(status_code=400, detail=f"Unknown Sarvam voice {voice!r}.")
+    # Only the key in use updates the shared status (unblocks stages after a fix).
+    is_current = cloud.key_fingerprint(key) == cloud.key_fingerprint()
+
+    started = time.perf_counter()
+    try:
+        english = sarvam.translate(key, _CLOUD_TEST_KN, src_lang="kan_Knda", tgt_lang="eng_Latn")
+        if is_current:
+            cloud.record_ok("translation", round((time.perf_counter() - started) * 1000))
+        started = time.perf_counter()
+        audio, sr = sarvam.synthesise(key, _CLOUD_TEST_KN, voice=voice)
+        if is_current:
+            cloud.record_ok("tts", round((time.perf_counter() - started) * 1000))
+            # STT uses the same key and credits — a working key clears its error too.
+            cloud.record_ok("stt", 0)
+    except sarvam.CloudError as exc:
+        if is_current:
+            for stage in cloud.STAGES:
+                cloud.record_error(stage, exc)
+        return {"ok": False, "kind": exc.kind, "message": str(exc)}
+
+    buf = io.BytesIO()
+    sf.write(buf, audio, sr, format="WAV")
+    return {
+        "ok": True,
+        "kind": None,
+        "message": "The key works.",
+        "translation": english,
+        "audio_b64": base64.b64encode(buf.getvalue()).decode("ascii"),
+    }
+
+
 @router.post("/admin/login")
 def admin_login(body: LoginBody) -> dict:
     try:

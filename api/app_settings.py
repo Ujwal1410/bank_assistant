@@ -2,18 +2,13 @@
 
 from __future__ import annotations
 
-import json
 import os
 from threading import Lock
 
+from backend import runtime_settings
+
 _lock = Lock()
 VALID_SPEAKERS = frozenset({"Suresh", "Anu"})
-
-_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_SETTINGS_PATH = os.environ.get(
-    "BANK_RUNTIME_SETTINGS_FILE",
-    os.path.join(_PROJECT_ROOT, "data", "runtime_settings.json"),
-)
 
 
 def _normalise_speaker(name: str) -> str:
@@ -27,10 +22,8 @@ def _normalise_speaker(name: str) -> str:
 
 def _load_saved_speaker() -> str | None:
     try:
-        with open(_SETTINGS_PATH, encoding="utf-8") as handle:
-            payload = json.load(handle)
-        return _normalise_speaker(str(payload.get("speaker") or ""))
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return _normalise_speaker(str(runtime_settings.read_all().get("speaker") or ""))
+    except (ValueError, TypeError):
         return None
 
 
@@ -55,11 +48,6 @@ def set_tts_speaker(name: str) -> str:
     with _lock:
         _speaker = normalized
         os.environ["BANK_TTS_SPEAKER"] = normalized
-        settings_dir = os.path.dirname(_SETTINGS_PATH)
-        if settings_dir:
-            os.makedirs(settings_dir, exist_ok=True)
-        temporary = f"{_SETTINGS_PATH}.{os.getpid()}.tmp"
-        with open(temporary, "w", encoding="utf-8") as handle:
-            json.dump({"speaker": normalized}, handle)
-        os.replace(temporary, _SETTINGS_PATH)
+        # Merge so the cloud-provider settings in the same file are kept.
+        runtime_settings.update({"speaker": normalized})
     return normalized

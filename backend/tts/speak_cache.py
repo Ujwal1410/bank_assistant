@@ -33,9 +33,13 @@ def _max_cache_entries() -> int:
         return 160
 
 
-def _cache_key(text: str, speaker: str | None = None) -> str:
-    sp = (speaker or os.environ.get("BANK_TTS_SPEAKER", "")).strip()
+def _cache_key(text: str, speaker: str | None = None, profile: str | None = None) -> str:
     version = os.environ.get("BANK_TTS_CACHE_VERSION", "v1").strip()
+    if profile:
+        # Cloud voices (e.g. "sarvam|bulbul:v3|shubh") never share clips with Parler.
+        payload = f"{version}\0{profile}\0{(text or '').strip()}"
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:20]
+    sp = (speaker or os.environ.get("BANK_TTS_SPEAKER", "")).strip()
     engine = os.environ.get("BANK_TTS_ENGINE", "auto").strip().lower()
     model = os.environ.get("BANK_PARLER_MODEL", "ai4bharat/indic-parler-tts").strip()
     settings = "|".join(
@@ -70,10 +74,15 @@ def _wav_too_short(raw: bytes, min_s: float = 0.12) -> bool:
         return True
 
 
-def get_cached_b64(text: str, *, speaker: str | None = None) -> str | None:
+def get_cached_b64(
+    text: str,
+    *,
+    speaker: str | None = None,
+    profile: str | None = None,
+) -> str | None:
     if not text or not text.strip():
         return None
-    key = _cache_key(text, speaker)
+    key = _cache_key(text, speaker, profile)
     with _CACHE_LOCK:
         hit = _CACHE.get(key)
     if hit:
@@ -99,6 +108,7 @@ def put_cached_b64(
     *,
     speaker: str | None = None,
     persist: bool = False,
+    profile: str | None = None,
 ) -> None:
     if not text.strip() or not audio_b64:
         return
@@ -113,7 +123,7 @@ def put_cached_b64(
             flush=True,
         )
         return
-    key = _cache_key(text, speaker)
+    key = _cache_key(text, speaker, profile)
     max_entries = _max_cache_entries()
     with _CACHE_LOCK:
         if key not in _CACHE and len(_CACHE) >= max_entries:
@@ -138,6 +148,46 @@ def put_cached_b64(
 
 def _key_lock(key: str) -> threading.Lock:
     return _KEY_LOCKS[int(key[:8], 16) % len(_KEY_LOCKS)]
+
+
+def _cloud_to_b64(text: str, *, persist: bool, bypass_cache: bool) -> str | None:
+    """Sarvam voice (cached under its own profile), or None to use the local voice."""
+    from backend.tts import cloud_tts_profile, synthesise_kannada_cloud
+
+    profile = cloud_tts_profile()
+    if profile is None:
+        return None
+    if not bypass_cache:
+        hit = get_cached_b64(text, profile=profile)
+        if hit:
+            print("[tts] cloud cache_hit=1", file=sys.stderr, flush=True)
+            return hit
+    key = _cache_key(text, profile=profile)
+    with _key_lock(key):
+        if not bypass_cache:
+            hit = get_cached_b64(text, profile=profile)
+            if hit:
+                return hit
+        started = time.perf_counter()
+        result = synthesise_kannada_cloud(text)
+        if result is None:
+            return None  # Sarvam failed — caller falls back to the local voice
+        audio, sr = result
+        from backend.tts.audio_util import trim_trailing_silence
+
+        audio = trim_trailing_silence(audio, sr)
+        import soundfile as sf
+
+        buf = io.BytesIO()
+        sf.write(buf, audio, sr, format="WAV")
+        b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        put_cached_b64(text, b64, persist=persist, profile=profile)
+        print(
+            f"[tts] sarvam synthesis_ms={round((time.perf_counter() - started) * 1000)}",
+            file=sys.stderr,
+            flush=True,
+        )
+        return b64
 
 
 def kannada_to_b64(
@@ -174,6 +224,10 @@ def kannada_to_b64(
         except Exception:
             speaker = os.environ.get("BANK_TTS_SPEAKER", "Suresh")
     speaker = "Anu" if str(speaker).strip().lower() == "anu" else "Suresh"
+
+    cloud_b64 = _cloud_to_b64(text, persist=persist, bypass_cache=bypass_cache)
+    if cloud_b64:
+        return cloud_b64
 
     if not bypass_cache:
         hit = get_cached_b64(

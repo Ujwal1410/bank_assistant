@@ -90,6 +90,42 @@ def _save_audio(audio: np.ndarray, sr: int, output_path: str) -> None:
     sf.write(output_path, audio, sr)
 
 
+def cloud_tts_profile() -> str | None:
+    """Cache profile for Sarvam voice output, or None when the local voice is in use."""
+    from backend import cloud
+
+    if not cloud.cloud_selected("tts"):
+        return None
+    if not cloud.use_cloud("tts"):
+        if cloud.fallback_allowed():
+            return None
+        raise cloud.unavailable_error("voice")
+    from backend.cloud.sarvam import TTS_MODEL_DEFAULT
+
+    model = os.environ.get("SARVAM_TTS_MODEL", "").strip() or TTS_MODEL_DEFAULT
+    return f"sarvam|{model}|{cloud.get_config()['sarvam_voice']}"
+
+
+def synthesise_kannada_cloud(kannada_text: str) -> tuple[np.ndarray, int] | None:
+    """Sarvam voice for prepared Kannada text, or None to use the local voice."""
+    from backend import cloud
+
+    if cloud_tts_profile() is None:
+        return None
+    from backend.cloud import sarvam
+
+    voice = cloud.get_config()["sarvam_voice"]
+    try:
+        return cloud.call_cloud(
+            "tts",
+            lambda key: sarvam.synthesise(key, kannada_text, voice=voice),
+        )
+    except Exception:
+        if cloud.fallback_allowed():
+            return None
+        raise
+
+
 def synthesise_kannada(
     kannada_text: str,
     output_path: str | None = None,
@@ -110,6 +146,14 @@ def synthesise_kannada(
 
     # Parler must also receive digit words — raw "1234567890" is misread.
     kannada_text = prepare_kannada_for_tts(kannada_text)
+
+    cloud_result = synthesise_kannada_cloud(kannada_text)
+    if cloud_result is not None:
+        if output_path:
+            _save_audio(cloud_result[0], cloud_result[1], output_path)
+        if play:
+            _play_audio(cloud_result[0], cloud_result[1])
+        return cloud_result
 
     selected_speaker = speaker
     if not selected_speaker and voice_description:
