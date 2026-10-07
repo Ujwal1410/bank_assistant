@@ -31,15 +31,14 @@ from faster_whisper import WhisperModel
 from backend.stt.exceptions import STTInputError
 from backend.stt.utils import is_silent, validate_audio_file
 
+# Default Kannada context — deliberately SHORT. Whisper has a 448-token window
+# shared by prompt + answer, and Kannada costs ~2-3 tokens per letter. The old long
+# prompt + 17-word hotword list left too little room and cut answers mid-word
+# ("ಎಟಿಎಂ ಕಾರ್ಡ್ ಬ್ಲಾ…"). Measured on the production GPU model, 11 real clips + 18
+# spoken requests: long = 26/29 intents, 9/29 cut off; short = 27/29, 0 cut off.
 # faster-whisper expects hotwords as a single space-separated string, not a list.
-_BANKING_HOTWORDS = (
-    "ಖಾತೆ ಸಾಲ ಠೇವಣಿ ಬ್ಯಾಂಕ್ ಬಾಕಿ ಹಿಂಪಡೆಯುವಿಕೆ ವರ್ಗಾಯಿಸು "
-    "ಬಡ್ಡಿ ಎಟಿಎಂ ಕಾರ್ಡ್ ಮೊಬೈಲ್ ಪಿನ್ ಚೆಕ್ ಶಾಖೆ "
-    "ಹೆಸರು ಪೂರ್ಣ ಹೆಸರು ನನ್ನ ಹೆಸರು"
-)
-_BANKING_INITIAL_PROMPT = (
-    "ಕನ್ನಡದಲ್ಲಿ ಮಾತನಾಡಿ. ಖಾತೆ, ಸಾಲ, ಠೇವಣಿ, ಹಿಂಪಡೆಯುವಿಕೆ, ಬ್ಯಾಂಕ್."
-)
+_BANKING_HOTWORDS = "ಖಾತೆ ಸಾಲ ಬಾಕಿ ಬಡ್ಡಿ ಪಿನ್ ಚೆಕ್ ಕಾರ್ಡ್"
+_BANKING_INITIAL_PROMPT = "ಬ್ಯಾಂಕ್ ಗ್ರಾಹಕರ ಕನ್ನಡ ಪ್ರಶ್ನೆ."
 
 
 def _detect_device() -> str:
@@ -223,7 +222,13 @@ class KannadaTranscriber:
 
         # Segments are a lazy generator — iterate to materialise them
         text = " ".join(seg.text.strip() for seg in segments).strip()
+        # A decode that stops mid-character leaves U+FFFD — never pass it on to NLU/forms.
+        text = text.replace("�", "").strip()
 
         self.last_inference_time_s = time.perf_counter() - t_start
+
+        # Apply post-processing corrections for common Whisper Kannada mistakes
+        from backend.stt.corrections import apply_corrections
+        text = apply_corrections(text)
 
         return text

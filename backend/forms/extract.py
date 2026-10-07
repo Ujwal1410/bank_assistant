@@ -107,6 +107,85 @@ _INTEREST_PAYOUT = {
     "cumulative": "Cumulative / On maturity",
 }
 
+# Kannada option words (incl. common English loanwords as spoken) for choice fields.
+# Matched on the Kannada transcript, so a slightly misheard word ("ಉಳಿದಾಯ" for
+# "ಉಳಿತಾಯ") still lands on the right option instead of a wrong translation
+# ("Remaining").
+_KN_CHOICES: dict[str, dict[str, str]] = {
+    "account_type": {
+        "ಉಳಿತಾಯ": "Savings",
+        "ಸೇವಿಂಗ್ಸ್": "Savings",
+        "ಚಾಲ್ತಿ": "Current",
+        "ಕರೆಂಟ್": "Current",
+        "ವೇತನ": "Salary",
+        "ಸ್ಯಾಲರಿ": "Salary",
+    },
+    "loan_type": {
+        "ಗೃಹ": "Home Loan",
+        "ಮನೆ": "Home Loan",
+        "ವೈಯಕ್ತಿಕ": "Personal Loan",
+        "ಪರ್ಸನಲ್": "Personal Loan",
+        "ಶಿಕ್ಷಣ": "Education Loan",
+        "ಎಜುಕೇಶನ್": "Education Loan",
+        "ವಾಹನ": "Car Loan",
+        "ಕಾರ್": "Car Loan",
+        "ಚಿನ್ನ": "Gold Loan",
+        "ಗೋಲ್ಡ್": "Gold Loan",
+    },
+    "deposit_mode": {
+        "ನಗದು": "Cash",
+        "ಕ್ಯಾಶ್": "Cash",
+        "ಚೆಕ್": "Cheque",
+        "ಡಿಡಿ": "Demand Draft",
+    },
+    "interest_payout": {
+        "ತ್ರೈಮಾಸಿಕ": "Quarterly",
+        "ಮಾಸಿಕ": "Monthly",
+        "ತಿಂಗಳು": "Monthly",
+        "ಮುಕ್ತಾಯ": "On maturity",
+        "ಅವಧಿ ಪೂರ್ಣ": "On maturity",
+    },
+}
+
+# Choice fields whose answer MUST be one of these values. An unrecognised answer
+# returns "" (→ validation asks again, listing the options) rather than saving
+# whatever the translation produced.
+CHOICE_OPTIONS: dict[str, frozenset[str]] = {
+    "account_type": frozenset({"Savings", "Current", "Salary", "Fixed Deposit"}),
+    "loan_type": frozenset(
+        {"Home Loan", "Personal Loan", "Education Loan", "Car Loan", "Gold Loan"}
+    ),
+    "deposit_mode": frozenset({"Cash", "Cheque", "Demand Draft"}),
+    "interest_payout": frozenset(
+        {"Monthly", "Quarterly", "On maturity", "Cumulative / On maturity"}
+    ),
+}
+
+
+def _match_choice_kannada(kannada: str, field_id: str, *, fuzzy: bool = True) -> str | None:
+    """Exact Kannada option word first, then (if fuzzy) a near match one or two letters off."""
+    options = _KN_CHOICES.get(field_id)
+    text = (kannada or "").strip()
+    if not options or not text:
+        return None
+    for key in sorted(options, key=len, reverse=True):
+        if key in text:
+            return options[key]
+    if not fuzzy:
+        return None
+    from difflib import SequenceMatcher
+
+    best, best_ratio = None, 0.0
+    for word in re.findall(r"\S+", text):
+        for key, value in options.items():
+            if len(key) < 4:  # too short to fuzzy-match safely
+                continue
+            ratio = SequenceMatcher(None, word, key).ratio()
+            if ratio > best_ratio:
+                best, best_ratio = value, ratio
+    return best if best_ratio >= 0.8 else None
+
+
 _IFSC_RE = re.compile(r"\b([A-Z]{4}0[A-Z0-9]{6})\b", re.I)
 _PAN_RE = re.compile(r"\b([A-Z]{5}\d{4}[A-Z])\b", re.I)
 _MOBILE_RE = re.compile(r"\b([6-9]\d{9})\b")
@@ -205,8 +284,25 @@ def _extract_name(text: str) -> str:
     return " ".join(w.capitalize() for w in cleaned.split())
 
 
+def _words_to_date_part(tokens: list[str]) -> int | None:
+    """Convert a list of English number word tokens to an integer (for day/month/year).
+    Handles: 'fourteen'=14, 'two thousand three'=2003, 'nineteen ninety five'=1995.
+    """
+    # Special: "nineteen|eighteen|seventeen... <tens><ones>" = 1900s/1800s etc.
+    # e.g. 'nineteen ninety five' -> 1995, 'nineteen eighty' -> 1980
+    if len(tokens) >= 2 and tokens[0] in _ONES:
+        century_prefix = _ONES[tokens[0]]  # e.g. nineteen=19
+        if 13 <= century_prefix <= 20:
+            rest = _words_to_number(tokens[1:])
+            if rest is not None and 0 <= rest <= 99:
+                return century_prefix * 100 + rest
+    return _words_to_number(tokens)
+
+
 def _extract_date(text: str) -> str:
     t = text.strip()
+
+    # 1. Try digit patterns first (14/10/2003 or 14-10-2003)
     for fmt, out_fmt in (
         (r"(\d{1,2})[/-](\d{1,2})[/-](\d{4})", "%d/%m/%Y"),
         (r"(\d{1,2})[/-](\d{1,2})[/-](\d{2})", "%d/%m/%y"),
@@ -225,8 +321,112 @@ def _extract_date(text: str) -> str:
                 return dt.strftime("%d/%m/%Y")
             except ValueError:
                 pass
+
     if re.search(r"\btoday\b", t, re.I):
         return datetime.now().strftime("%d/%m/%Y")
+
+    # 2. Try English number words — handles "fourteen ten two thousand three"
+    #    Strategy: tokenize, then greedily parse day/month/year groups.
+    #    Day = first 1–2 word group (1–31)
+    #    Month = second 1–2 word group (1–12)
+    #    Year = remaining tokens (e.g. "two thousand three" = 2003)
+    clean = re.sub(r"[,./\-]+", " ", t.lower()).strip()
+    clean = re.sub(r"\b(of|the|st|nd|rd|th|born|dob|date|birth|my|is)\b", " ", clean)
+    clean = re.sub(r"\s+", " ", clean).strip()
+    tokens = [tok for tok in clean.split() if tok]
+
+    # All-word tokens — try to extract 3 groups
+    # Use a sliding window: try all split points [i, j] where
+    # tokens[0:i] = day, tokens[i:j] = month, tokens[j:] = year
+    best: tuple[int, int, int] | None = None
+    for i in range(1, min(3, len(tokens))):
+        for j in range(i + 1, min(i + 3, len(tokens))):
+            day_tok = tokens[:i]
+            mon_tok = tokens[i:j]
+            yr_tok = tokens[j:]
+            if not yr_tok:
+                continue
+            day = _words_to_date_part(day_tok)
+            mon = _words_to_date_part(mon_tok)
+            yr = _words_to_date_part(yr_tok)
+            if day is None or mon is None or yr is None:
+                continue
+            if not (1 <= day <= 31 and 1 <= mon <= 12):
+                continue
+            # Prefer 4-digit years; handle 2-digit years (e.g. "three" = 2003? no — 3)
+            # Only accept years >= 1900
+            if yr < 100:
+                yr = 2000 + yr if yr < 50 else 1900 + yr
+            if yr < 1900 or yr > 2100:
+                continue
+            best = (day, mon, yr)
+            break
+        if best:
+            break
+
+    if best:
+        day, mon, yr = best
+        try:
+            dt = datetime(yr, mon, day)
+            return dt.strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+
+    # 3. Mixed: some digits, some words — try to extract 3 numeric tokens
+    num_tokens: list[int] = []
+    all_toks = _tokenize(t)
+    i = 0
+    while i < len(all_toks) and len(num_tokens) < 4:
+        tok = all_toks[i]
+        if tok.isdigit():
+            num_tokens.append(int(tok))
+            i += 1
+        elif tok in _ONES:
+            # Try to build a multi-word number (for year like "two thousand three")
+            sub: list[str] = []
+            while i < len(all_toks):
+                t2 = all_toks[i]
+                if t2 in _ONES or t2 in _TENS or t2 in _SCALES or t2.isdigit():
+                    sub.append(t2)
+                    i += 1
+                    # Stop if we have enough for day/month (1-2 words) or a year
+                    n = _words_to_number(sub)
+                    if n is not None and (1 <= n <= 31 or n >= 1000):
+                        # If it's a plausible year (>100), stop here
+                        if n > 31:
+                            num_tokens.append(n)
+                            break
+                        # Otherwise see if next token extends the number
+                        if i < len(all_toks) and all_toks[i] not in _ONES and all_toks[i] not in _TENS and all_toks[i] not in _SCALES:
+                            num_tokens.append(n)
+                            break
+                else:
+                    n = _words_to_number(sub)
+                    if n is not None:
+                        num_tokens.append(n)
+                    break
+        elif tok in _TENS:
+            sub = [tok]
+            i += 1
+            if i < len(all_toks) and all_toks[i] in _ONES:
+                sub.append(all_toks[i])
+                i += 1
+            n = _words_to_number(sub)
+            if n is not None:
+                num_tokens.append(n)
+        else:
+            i += 1
+
+    if len(num_tokens) >= 3:
+        d, m2, y = num_tokens[0], num_tokens[1], num_tokens[2]
+        if y < 100:
+            y = 2000 + y if y < 50 else 1900 + y
+        try:
+            dt = datetime(y, m2, d)
+            return dt.strftime("%d/%m/%Y")
+        except ValueError:
+            pass
+
     return t
 
 
@@ -282,6 +482,7 @@ def extract_field_value(
     english_text: str,
     field_type: str = "text",
     field_id: str = "",
+    kannada_text: str = "",
 ) -> str:
     """
     Turn IndicTrans2 English output into a clean form-box value.
@@ -296,20 +497,28 @@ def extract_field_value(
         Field id for specialized maps (account_type, loan_type, ifsc, …).
     """
     text = (english_text or "").strip()
-    if not text:
-        return ""
-
     fid = (field_id or "").lower()
     ftype = (field_type or "text").lower()
 
-    if fid == "deposit_mode":
-        return _match_choice(text, _DEPOSIT_MODES) or text.strip().title()
+    choice_key = "interest_payout" if fid == "interest_payment" else fid
+    if choice_key in CHOICE_OPTIONS:
+        english_map = {
+            "account_type": _ACCOUNT_TYPES,
+            "loan_type": _LOAN_TYPES,
+            "deposit_mode": _DEPOSIT_MODES,
+            "interest_payout": _INTEREST_PAYOUT,
+        }[choice_key]
+        # Customer's own Kannada word > translation > near-miss Kannada word.
+        # No match -> "" so validation re-asks with the options (never "Remaining").
+        return (
+            _match_choice_kannada(kannada_text, choice_key, fuzzy=False)
+            or _match_choice(text, english_map)
+            or _match_choice_kannada(kannada_text, choice_key)
+            or ""
+        )
 
-    if fid == "account_type":
-        return _match_choice(text, _ACCOUNT_TYPES) or text.strip().title()
-
-    if fid == "loan_type":
-        return _match_choice(text, _LOAN_TYPES) or text.strip().title()
+    if not text:
+        return ""
 
     if fid in {"card_type", "atm_card_type"}:
         return _match_choice(text, _CARD_TYPES) or "ATM / Debit Card"
@@ -323,9 +532,6 @@ def extract_field_value(
 
     if fid in {"tenure", "fd_tenure", "deposit_tenure"}:
         return _match_choice(text, _FD_TENURE) or text.strip()
-
-    if fid in {"interest_payout", "interest_payment"}:
-        return _match_choice(text, _INTEREST_PAYOUT) or text.strip().title()
 
     if fid in {"ifsc", "ifsc_code", "beneficiary_ifsc"}:
         return _extract_ifsc(text)

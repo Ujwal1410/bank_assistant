@@ -181,7 +181,7 @@ export async function processAudio(
   const res = await fetchWithTimeout(`${API_BASE}/api/process-audio`, {
     method: "POST",
     body: formData,
-    timeoutMs: 120_000,
+    timeoutMs: 0,          // no client timeout — wait until server responds
     signal: options?.signal,
   });
 
@@ -202,7 +202,7 @@ export async function transcribeAudio(
   const res = await fetchWithTimeout(`${API_BASE}/api/transcribe-audio`, {
     method: "POST",
     body: formData,
-    timeoutMs: 90_000,
+    timeoutMs: 0,          // no client timeout — wait until server responds
   });
 
   if (!res.ok) {
@@ -328,7 +328,7 @@ export async function submitFormSubmission(payload: {
   title_en: string;
   values: Record<string, string>;
   kiosk_session_id?: string;
-}): Promise<{ ok: boolean; submission: { id: string } }> {
+}): Promise<{ ok: boolean; submission: { id: string }; confirmation_kn?: string; confirmation_en?: string }> {
   const res = await fetchWithTimeout(`${API_BASE}/api/forms/submit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -419,7 +419,7 @@ export async function fetchFormPromptAudio(formId: string): Promise<Record<strin
 
   const res = await fetchWithTimeout(
     `${API_BASE}/api/forms/${encodeURIComponent(formId)}/prompt-audio`,
-    { timeoutMs: 180_000 },
+    { timeoutMs: 0 },     // no client timeout — model loading can take time
   );
   if (!res.ok) throw new Error("Failed to load form prompt audio");
   const data = await res.json();
@@ -489,7 +489,7 @@ export async function fetchSpeakKannada(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, speaker: speaker || undefined }),
-      timeoutMs: 90_000,
+      timeoutMs: 0,        // no client timeout — wait for TTS to finish
       signal,
     });
     if (!res.ok) {
@@ -553,7 +553,7 @@ export async function transcribeFormAudio(
   const res = await fetchWithTimeout(`${API_BASE}/api/forms/transcribe`, {
     method: "POST",
     body: formData,
-    timeoutMs: 120_000,
+    timeoutMs: 0,          // no client timeout
   });
 
   if (!res.ok) {
@@ -592,7 +592,7 @@ export async function fillFormFieldAudio(
       const res = await fetchWithTimeout(`${API_BASE}/api/forms/fill-field`, {
         method: "POST",
         body: formData,
-        timeoutMs: 120_000,
+        timeoutMs: 0,      // no client timeout — wait until server responds
       });
 
       if (!res.ok) {
@@ -932,6 +932,31 @@ export async function fetchAdminConversationFlow(): Promise<ConversationFlowData
     timeoutMs: 15000,
   });
   if (!res.ok) throw new Error(await parseApiError(res, "Failed to load conversation flow"));
+  return res.json();
+}
+
+export interface SystemHealth {
+  status: string;
+  pipeline_worker?: boolean;
+  tts?: {
+    available?: boolean;
+    ready?: boolean;
+    speaker?: string;
+    engine_env?: string;
+    remote?: {
+      configured?: boolean;
+      url?: string;
+      healthy?: boolean;
+      ready?: boolean;
+      warmup?: { phrases_cached?: number; elapsed_s?: number; error?: string | null } | null;
+    };
+  };
+}
+
+/** Full health (pipeline + TTS box) for the staff dashboard. */
+export async function fetchSystemHealth(): Promise<SystemHealth> {
+  const res = await fetchWithTimeout(`${API_BASE}/api/health`, { timeoutMs: 12000 });
+  if (!res.ok) throw new Error(`Health check failed (${res.status})`);
   return res.json();
 }
 

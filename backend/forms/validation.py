@@ -20,14 +20,22 @@ MOBILE_RETRY_KN = (
     "ದಯವಿಟ್ಟು ಹತ್ತು ಅಂಕಿಯ ಮೊಬೈಲ್ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
 )
 ACCOUNT_RETRY_KN = (
-    "ದಯವಿಟ್ಟು ಹತ್ತು ಅಂಕೆಗಳ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ. "
-    "ಕೊನೆಯ ಸೊನ್ನೆಯನ್ನು ಮರೆಯಬೇಡಿ."
+    "ದಯವಿಟ್ಟು ನಿಮ್ಮ ಖಾತೆ ಸಂಖ್ಯೆಯ ಕೊನೆಯ ನಾಲ್ಕು ಅಂಕಿಗಳನ್ನು ಹೇಳಿ, "
+    "ಅಥವಾ ಪೂರ್ತಿ ಹತ್ತು ಅಂಕಿಗಳ ಸಂಖ್ಯೆ ಹೇಳಿ."
 )
 CHEQUE_LEAVES_RETRY_KN = "ದಯವಿಟ್ಟು ಹತ್ತು, ಇಪ್ಪತ್ತೈದು ಅಥವಾ ಐವತ್ತು ಎಂದು ಹೇಳಿ."
 DIGITS_RETRY_KN = (
     "ಸಂಖ್ಯೆಯನ್ನು ಗುರುತಿಸಲಾಗಲಿಲ್ಲ. ದಯವಿಟ್ಟು ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಮತ್ತೆ ಹೇಳಿ."
 )
+# Choice fields: re-ask with the options instead of saving an unrecognised word.
+CHOICE_RETRY_KN = {
+    "account_type": "ದಯವಿಟ್ಟು ಉಳಿತಾಯ, ಚಾಲ್ತಿ ಅಥವಾ ವೇತನ ಖಾತೆ ಎಂದು ಹೇಳಿ.",
+    "loan_type": "ದಯವಿಟ್ಟು ಗೃಹ ಸಾಲ, ವೈಯಕ್ತಿಕ ಸಾಲ, ಶಿಕ್ಷಣ ಸಾಲ ಅಥವಾ ವಾಹನ ಸಾಲ ಎಂದು ಹೇಳಿ.",
+    "deposit_mode": "ದಯವಿಟ್ಟು ನಗದು ಅಥವಾ ಚೆಕ್ ಎಂದು ಹೇಳಿ.",
+    "interest_payout": "ದಯವಿಟ್ಟು ಮಾಸಿಕ, ತ್ರೈಮಾಸಿಕ ಅಥವಾ ಅವಧಿ ಪೂರ್ಣಗೊಂಡಾಗ ಎಂದು ಹೇಳಿ.",
+}
 STATIC_VALIDATION_PHRASES = (
+    *CHOICE_RETRY_KN.values(),
     DATE_RETRY_KN,
     FUTURE_DOB_KN,
     MOBILE_RETRY_KN,
@@ -48,6 +56,14 @@ def validate_captured_value(
     normalized_id = (field_id or "").strip().lower()
     text = (value or "").strip()
 
+    choice_key = "interest_payout" if normalized_id == "interest_payment" else normalized_id
+    if choice_key in CHOICE_RETRY_KN:
+        from backend.forms.extract import CHOICE_OPTIONS
+
+        if text not in CHOICE_OPTIONS[choice_key]:
+            return CHOICE_RETRY_KN[choice_key]
+        return None
+
     if normalized_type == "date":
         try:
             parsed = datetime.strptime(text, "%d/%m/%Y")
@@ -67,13 +83,15 @@ def validate_captured_value(
         from backend.forms.stt_tuning import expected_account_length
 
         expected = expected_account_length()
-        if len(digits) != expected:
-            if expected == 10:
-                return ACCOUNT_RETRY_KN
-            return (
-                f"ದಯವಿಟ್ಟು {expected} ಅಂಕೆಗಳ ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು "
-                "ಒಂದೊಂದೇ ಅಂಕಿಯಾಗಿ ಹೇಳಿ."
-            )
+        # Allow 4 digits (last-4 shortcut) or 6 digits (disambiguation)
+        if len(digits) in {4, 6, expected}:
+            return None
+        if expected == 10:
+            return ACCOUNT_RETRY_KN
+        return (
+            f"ದಯವಿಟ್ಟು ಕೊನೆಯ ನಾಲ್ಕು ಅಂಕಿಗಳನ್ನು ಅಥವಾ ಪೂರ್ತಿ {expected} ಅಂಕೆಗಳ "
+            "ಖಾತೆ ಸಂಖ್ಯೆಯನ್ನು ಹೇಳಿ."
+        )
     if normalized_id == "number_of_leaves" and digits not in {"10", "25", "50"}:
         return CHEQUE_LEAVES_RETRY_KN
     if not digits:
