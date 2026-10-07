@@ -300,6 +300,9 @@ def get_account_by_last4(last4: str) -> list[dict[str, Any]]:
         for acct, row in demo.items()
         if acct.endswith(digits)
     ]
+
+
+def list_customer_loans(customer_id: str) -> list[dict[str, Any]]:
     if store_mode() != "sqlite" or not customer_id:
         return []
     init_customer_db()
