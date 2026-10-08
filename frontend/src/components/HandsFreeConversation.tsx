@@ -1226,6 +1226,7 @@ export function HandsFreeConversation({
                 value={draft}
                 fieldType={currentField.type}
                 fieldId={currentField.id}
+                lastDigits={form?.id === "balance_inquiry" && currentField.id === "account_number"}
               />
             )}
 

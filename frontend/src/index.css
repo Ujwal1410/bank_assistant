@@ -1260,6 +1260,12 @@ body:has(.lobby-shell),
   color: #0e1c2c;
 }
 
+.live-digit-slot.is-masked {
+  border-color: #c9d6e4;
+  background: #eef3f8;
+  color: #7a8ca0;
+}
+
 .live-digit-slot.is-filled {
   border-color: #2d8a5e;
   background: #e8f6ee;
