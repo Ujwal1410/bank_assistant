@@ -5,30 +5,46 @@ interface FormDigitSlotsProps {
   value: string;
   maxSlots?: number;
   label?: string;
+  /**
+   * The customer gives only the end of the number (balance: last 4 or 6 digits).
+   * Digits fill the last boxes and the boxes before them show "*".
+   */
+  lastDigits?: boolean;
 }
 
-export function FormDigitSlots({ value, maxSlots = 10, label }: FormDigitSlotsProps) {
+export function FormDigitSlots({ value, maxSlots = 10, label, lastDigits = false }: FormDigitSlotsProps) {
   const digits = (value || "").replace(/\D/g, "").split("");
   const slots = Math.max(maxSlots, digits.length);
+  const hidden = lastDigits ? slots - digits.length : 0;
 
   return (
     <div className="live-digit-slots" aria-label={label || "Account digits"}>
       <div className="live-digit-row">
         {Array.from({ length: slots }, (_, i) => {
-          const filled = i < digits.length;
+          if (i < hidden) {
+            return (
+              <span key={i} className="live-digit-slot is-masked" aria-hidden>
+                *
+              </span>
+            );
+          }
+          const d = i - hidden;
+          const filled = d < digits.length;
           return (
             <span
               key={i}
               className={`live-digit-slot${filled ? " is-filled" : ""}`}
               aria-hidden
             >
-              {filled ? digits[i] : ""}
+              {filled ? digits[d] : ""}
             </span>
           );
         })}
       </div>
       {value && (
-        <p className="live-digit-mask">{displayFieldValue("account_number", "digits", value)}</p>
+        <p className="live-digit-mask">
+          {hidden > 0 ? "*".repeat(hidden) + digits.join("") : displayFieldValue("account_number", "digits", value)}
+        </p>
       )}
     </div>
   );
@@ -141,9 +157,17 @@ interface LiveValueCardProps {
   value: string;
   fieldType?: string;
   fieldId?: string;
+  /** Only the last digits are asked for (balance inquiry) — right-align them behind "*". */
+  lastDigits?: boolean;
 }
 
-export function LiveValueCard({ label, value, fieldType = "text", fieldId = "" }: LiveValueCardProps) {
+export function LiveValueCard({
+  label,
+  value,
+  fieldType = "text",
+  fieldId = "",
+  lastDigits = false,
+}: LiveValueCardProps) {
   if (!value) return null;
   const display = displayFieldValue(fieldId, fieldType, value);
   const showSlots = fieldType === "digits" && value.replace(/\D/g, "").length > 0;
@@ -152,7 +176,7 @@ export function LiveValueCard({ label, value, fieldType = "text", fieldId = "" }
     <div className="live-value-card">
       <p className="live-value-label">{label}</p>
       {showSlots ? (
-        <FormDigitSlots value={value} label={label} />
+        <FormDigitSlots value={value} label={label} lastDigits={lastDigits} />
       ) : (
         <p className="live-value-text">{display}</p>
       )}
