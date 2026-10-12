@@ -30,9 +30,8 @@ export function isAbortError(err: unknown): boolean {
 
 export function userFacingFetchError(err: unknown): string {
   if (isTimeoutError(err)) {
-    return "ಸೇವೆ ನಿಧಾನವಾಗಿದೆ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ · Server slow, please try again";
+    return "ಸೇವೆ ನಿಧಾನವಾಗಿದೆ — ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ";
   }
   if (isAbortError(err)) return "";
-  if (err instanceof Error) return err.message;
-  return "Request failed";
+  return "ಸಮಸ್ಯೆ ಆಯಿತು. ದಯವಿಟ್ಟು ಮತ್ತೊಮ್ಮೆ ಹೇಳಿ.";
 }

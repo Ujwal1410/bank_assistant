@@ -5,14 +5,12 @@ import {
   endKioskSession,
   fetchGreetingCatalog,
   fetchKioskGreetAudio,
-  fetchKioskStatus,
   fetchKioskStatusLite,
   reportKioskPresence,
   setKioskPhase,
   type KioskStatus,
 } from "../api/client";
 
-import { usePresence } from "../hooks/usePresence";
 import { startVisibilityAwarePoll } from "../utils/polling";
 
 import {
@@ -23,24 +21,24 @@ import {
   type GreetingCatalogSlot,
 } from "../utils/greetings";
 
-import {
-  playBase64Wav,
-  preloadBrowserVoices,
-  speakKannada,
-  speakKannadaBrowser,
-  unlockAudio,
-} from "../utils/playAudio";
+import { preloadBrowserVoices, unlockAudio } from "../utils/playAudio";
+import { SESSION_TARGET_S, formatDuration } from "../utils/sessionTime";
 
-import { HandsFreeConversation, type HandsFreeTurn } from "./HandsFreeConversation";
+import {
+  HandsFreeConversation,
+  type ConversationGreeting,
+  type HandsFreeTurn,
+} from "./HandsFreeConversation";
 
 import { LobbyBot, type MascotMood } from "./LobbyBot";
 import { SpeakGuideCard } from "./SpeakGuideCard";
 
+/** Customer-facing messages — never ports, URLs or technical errors on this screen. */
+const SERVICE_DOWN_KN = "ಸೇವೆ ತಾತ್ಕಾಲಿಕವಾಗಿ ಲಭ್ಯವಿಲ್ಲ. ದಯವಿಟ್ಟು ಸಿಬ್ಬಂದಿಯನ್ನು ಸಂಪರ್ಕಿಸಿ.";
+
 interface AgentLobbyProps {
   apiOnline: boolean | null;
 }
-
-type GreetVia = "cached" | "browser" | "api";
 
 /** Warm Parler greeting WAV on disk for the next customer (fire-and-forget). */
 function warmGreetingCache(greet: Greeting): void {
@@ -53,66 +51,13 @@ function warmGreetingCache(greet: Greeting): void {
   }).catch(() => undefined);
 }
 
-/**
- * Speak full time-of-day greeting via deployed Parler TTS only.
- * 1) Cached Parler WAV  2) Live /api/speak-kannada (remote Suresh)
- * Browser voice only if API/TTS is completely unavailable.
- */
-async function playTimeGreeting(
-  greet: Greeting,
-  apiOnline: boolean | null,
-): Promise<GreetVia> {
-  await unlockAudio();
-
-  if (greet.variant !== undefined) {
-    try {
-      const data = await fetchKioskGreetAudio({
-        slot: greet.slot,
-        hour: new Date().getHours(),
-        variant: greet.variant,
-        random: false,
-        generate: false,
-      });
-      if (data.audio_b64 && data.cached) {
-        await playBase64Wav(data.audio_b64);
-        return "cached";
-      }
-    } catch {
-      // fall through to live Parler
-    }
-  }
-
-  if (apiOnline !== false) {
-    try {
-      await speakKannada(greet.line_kn, undefined, apiOnline);
-      warmGreetingCache(greet);
-      return "api";
-    } catch {
-      // fall through
-    }
-  }
-
-  const browserOk = await speakKannadaBrowser(greet.line_kn);
-  if (browserOk) {
-    warmGreetingCache(greet);
-    return "browser";
-  }
-
-  return "browser";
-}
-
-function greetViaLabel(via: GreetVia): string {
-  if (via === "cached" || via === "api") return "ಕನ್ನಡ ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ";
-  return "ಬದಲಿ ಕನ್ನಡ ಧ್ವನಿ ಸಿದ್ಧವಾಗಿದೆ";
-}
-
 /** Pick greeting locally — no network wait. */
 function pickGreetingNow(catalog: GreetingCatalogSlot[] | null): Greeting {
   if (catalog?.length) return pickRandomFromCatalog(catalog);
   return greetingForNowFallback();
 }
 
-/** End a leftover session so the next customer gets a full greeting. */
+/** End a leftover session so the next customer starts fresh. */
 async function ensureIdleForNewCustomer(phase: string): Promise<KioskStatus | null> {
   if (phase !== "conversation" && phase !== "greeting") return null;
   return endKioskSession("New customer — session reset");
@@ -121,19 +66,22 @@ async function ensureIdleForNewCustomer(phase: string): Promise<KioskStatus | nu
 export function AgentLobby({ apiOnline }: AgentLobbyProps) {
   const [status, setStatus] = useState<KioskStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [greetStatus, setGreetStatus] = useState<string | null>(null);
+  /** Greeting for the current customer — spoken as the conversation's first line. */
+  const [sessionGreeting, setSessionGreeting] = useState<ConversationGreeting | null>(null);
+  /** When this customer's session started (for the on-screen timer). */
+  const [sessionStartMs, setSessionStartMs] = useState<number | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [activeGreet, setActiveGreet] = useState<Greeting>(() => greetingForNowFallback());
   const [greetCatalog, setGreetCatalog] = useState<GreetingCatalogSlot[] | null>(null);
   const [convoMood, setConvoMood] = useState<MascotMood>("listening");
 
   const greetingStarted = useRef(false);
-  const leaveTimer = useRef<number | null>(null);
-  const formModeActive = useRef(false);
+  /** True while the session on screen was started here (not a stale one to reset). */
+  const ownSession = useRef(false);
   const statusRef = useRef(status);
   const statusFailures = useRef(0);
   const hasLoadedStatus = useRef(false);
   const statusGraceUntil = useRef(Date.now() + 60_000);
-  const presenceRef = useRef<"unknown" | "absent" | "present">("unknown");
   statusRef.current = status;
 
   const mapTurnToMood = (turn: HandsFreeTurn): MascotMood => {
@@ -248,169 +196,42 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
     }
   }, []);
 
-  const runGreetingFlow = useCallback(async () => {
+  /** New customer: pick the greeting and go straight to the conversation screen. */
+  const startConversation = useCallback(async () => {
     const greet = pickGreetingNow(greetCatalog);
     setActiveGreet(greet);
-    setGreetStatus(`👋 ${greet.title_kn} — ಸ್ವಾಗತಿಸುತ್ತಿದ್ದೇನೆ…`);
-    await unlockAudio();
-    try {
-      const via = await playTimeGreeting(greet, apiOnline);
-      setGreetStatus(greetViaLabel(via));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Kannada greeting failed");
-      await unlockAudio();
-      await speakKannadaBrowser(greet.line_kn);
-    } finally {
-      window.setTimeout(() => setGreetStatus(null), 1200);
-    }
+    setSessionGreeting({ line_kn: greet.line_kn, slot: greet.slot, variant: greet.variant });
+    warmGreetingCache(greet);
+    setSessionStartMs(Date.now());
     await goToConversation();
-  }, [greetCatalog, goToConversation, apiOnline]);
+  }, [greetCatalog, goToConversation]);
 
-  const handlePresent = useCallback(() => {
-    void (async () => {
-      if (greetingStarted.current) return;
-
-      try {
-        let runningNow = statusRef.current?.running ?? false;
-        let phaseNow = statusRef.current?.phase ?? "stopped";
-
-        const live = await fetchKioskStatus();
-        setStatus(live);
-        runningNow = live.running;
-        phaseNow = live.phase;
-
-        if (!runningNow || greetingStarted.current) return;
-
-        // Stale session from a previous customer / closed tab / other device
-        if (phaseNow === "conversation" || phaseNow === "greeting") {
-          const reset = await ensureIdleForNewCustomer(phaseNow);
-          if (reset) {
-            setStatus(reset);
-            phaseNow = reset.phase;
-          }
-        }
-
-        if (phaseNow !== "idle" || greetingStarted.current) return;
-
-        greetingStarted.current = true;
-
-        await unlockAudio();
-        try {
-          await navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
-            s.getTracks().forEach((t) => t.stop());
-          });
-        } catch {
-          // Mic prompt may appear again in conversation
-        }
-
-        const greet = pickGreetingNow(greetCatalog);
-        setActiveGreet(greet);
-        setGreetStatus("ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ… · Preparing greeting voice");
-        setStatus((prev) =>
-          prev ? { ...prev, phase: "greeting", person_present: true } : prev,
-        );
-
-        await unlockAudio();
-
-        const speakPromise = playTimeGreeting(greet, apiOnline).then((via) => {
-          setGreetStatus(greetViaLabel(via));
-          window.setTimeout(() => setGreetStatus(null), 1200);
-        });
-
-        void reportKioskPresence(true).catch(() => undefined);
-
-        try {
-          const sessionStatus = await beginKioskSession();
-          setStatus(sessionStatus);
-        } catch (err) {
-          greetingStarted.current = false;
-          setError(err instanceof Error ? err.message : "Could not start session");
-          return;
-        }
-
-        try {
-          await speakPromise;
-        } catch (err) {
-          setError(err instanceof Error ? err.message : "Greeting voice failed");
-          await speakKannadaBrowser(greet.line_kn);
-        }
-
-        await goToConversation();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Presence update failed");
-        greetingStarted.current = false;
-      }
-    })();
-  }, [greetCatalog, goToConversation, apiOnline]);
-
-  const handleAbsent = useCallback(() => {
-    void reportKioskPresence(false).then(setStatus).catch(() => undefined);
-  }, []);
-
-  const { videoRef, canvasRef, presence, cameraError, detectorMode, retryCamera } =
-    usePresence({
-      enabled: running,
-      presentHoldMs: 350,
-      onPresent: handlePresent,
-      onAbsent: handleAbsent,
-    });
-
-  presenceRef.current = presence;
-
-  // Clear stuck sessions when lobby opens with nobody in frame (e.g. second device / refresh)
+  // A session left open by a closed tab, a refresh or another device — reset it so
+  // this screen starts fresh. Never touches the session this screen started itself.
   useEffect(() => {
-    if (!running || greetingStarted.current) return;
+    if (!running || greetingStarted.current || ownSession.current) return;
     if (phase !== "conversation" && phase !== "greeting") return;
-    if (presence !== "absent") return;
-
     const t = window.setTimeout(() => {
-      if (!greetingStarted.current && presenceRef.current === "absent") {
-        void endKioskSession("Reset for next customer").then((s) => {
-          setStatus(s);
-          greetingStarted.current = false;
-        });
-      }
+      if (greetingStarted.current || ownSession.current) return;
+      void endKioskSession("Reset for next customer").then((s) => {
+        setStatus(s);
+        greetingStarted.current = false;
+      });
     }, 2500);
-
     return () => window.clearTimeout(t);
-  }, [running, phase, presence]);
-
-  useEffect(() => {
-    if (!running || !inSession) {
-      if (leaveTimer.current) {
-        window.clearTimeout(leaveTimer.current);
-        leaveTimer.current = null;
-      }
-      return;
-    }
-    if (presence === "absent" && !formModeActive.current) {
-      leaveTimer.current = window.setTimeout(() => {
-        void endKioskSession("Customer left camera view").then((s) => {
-          setStatus(s);
-          greetingStarted.current = false;
-          formModeActive.current = false;
-        });
-      }, 14000);
-    } else if (leaveTimer.current) {
-      window.clearTimeout(leaveTimer.current);
-      leaveTimer.current = null;
-    }
-    return () => {
-      if (leaveTimer.current) window.clearTimeout(leaveTimer.current);
-    };
-  }, [presence, running, inSession]);
+  }, [running, phase]);
 
   useEffect(() => {
     if (!running) greetingStarted.current = false;
-    if (phase === "idle" || phase === "stopped") greetingStarted.current = false;
+    if (phase === "idle" || phase === "stopped") {
+      greetingStarted.current = false;
+      ownSession.current = false;
+    }
   }, [running, phase]);
 
   const handleManualStart = async () => {
     try {
       await unlockAudio();
-      await navigator.mediaDevices.getUserMedia({ audio: true }).then((s) => {
-        s.getTracks().forEach((t) => t.stop());
-      });
 
       let phaseNow = statusRef.current?.phase ?? "idle";
       if (phaseNow === "conversation" || phaseNow === "greeting") {
@@ -422,35 +243,54 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
       }
 
       greetingStarted.current = true;
+      ownSession.current = true;
       await reportKioskPresence(true);
       const next = await beginKioskSession();
       setStatus(next);
-      await runGreetingFlow();
+      await startConversation();
     } catch (err) {
       greetingStarted.current = false;
+      ownSession.current = false;
       setError(err instanceof Error ? err.message : "Could not start session");
     }
   };
 
   const handleEnd = async (note = "Ended on agent screen") => {
     try {
-      formModeActive.current = false;
+      ownSession.current = false;
       window.speechSynthesis?.cancel();
       const s = await endKioskSession(note);
       setStatus(s);
       greetingStarted.current = false;
-      setGreetStatus(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not end session");
     }
   };
 
+  // Session timer: target 3 minutes; past that it keeps counting the extra time.
+  useEffect(() => {
+    if (!inSession) {
+      setSessionStartMs(null);
+      return;
+    }
+    setSessionStartMs((prev) => prev ?? Date.now());
+    const id = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [inSession]);
+  const elapsedS = sessionStartMs ? Math.max(0, Math.floor((nowMs - sessionStartMs) / 1000)) : 0;
+  const overtime = elapsedS > SESSION_TARGET_S;
+
+  // Staff still see the real error in the browser console.
+  useEffect(() => {
+    if (error) console.warn("[lobby]", error);
+  }, [error]);
+
   const slotLabel = useMemo(() => {
     const map = {
-      morning: "ಬೆಳಗ್ಗೆ · Morning",
-      afternoon: "ಮಧ್ಯಾಹ್ನ · Afternoon",
-      evening: "ಸಂಜೆ · Evening",
-      night: "ರಾತ್ರಿ · Night",
+      morning: "ಬೆಳಗ್ಗೆ",
+      afternoon: "ಮಧ್ಯಾಹ್ನ",
+      evening: "ಸಂಜೆ",
+      night: "ರಾತ್ರಿ",
     } as const;
     return map[activeGreet.slot];
   }, [activeGreet.slot]);
@@ -473,9 +313,8 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
               </span>
               <p className="lobby-brand kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</p>
             </div>
-            <div className="spinner" role="status" aria-label="Loading lobby status" />
+            <div className="spinner" role="status" aria-label="ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ" />
             <h1 className="kn">ಮಾಹಿತಿ ಪಡೆಯಲಾಗುತ್ತಿದೆ…</h1>
-            <p className="lobby-waiting-en">Connecting to counter service…</p>
           </div>
         </div>
       </div>
@@ -505,9 +344,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
             <p className="lobby-waiting-kn kn">
               ದಯವಿಟ್ಟು ಸಿಬ್ಬಂದಿಯವರು ಈ ಕೌಂಟರ್ ತೆರೆಯುವವರೆಗೆ ಕಾಯಿರಿ.
             </p>
-            <p className="lobby-waiting-en">Lobby closed — waiting for staff to open the counter.</p>
-            {apiOnline === false && <p className="api-warning">Service offline</p>}
-            {error && <p className="api-warning">{error}</p>}
+            {(apiOnline === false || error) && <p className="api-warning">{SERVICE_DOWN_KN}</p>}
           </div>
         </div>
       </div>
@@ -515,7 +352,7 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
   }
 
   return (
-    <div className={`lobby-shell lobby-fit lobby-v2 lobby-phase-${phase} slot-${activeGreet.slot}`}>
+    <div className={`lobby-shell lobby-fit lobby-v2 lobby-phase-${inSession ? "conversation" : phase} slot-${activeGreet.slot}`}>
       <div className="lobby-ambient" aria-hidden>
         <span className="lobby-ambient-orb lobby-ambient-orb--1" />
         <span className="lobby-ambient-orb lobby-ambient-orb--2" />
@@ -527,146 +364,74 @@ export function AgentLobby({ apiOnline }: AgentLobbyProps) {
           </span>
           <div>
             <p className="lobby-brand kn">ಕನ್ನಡ ಧ್ವನಿ ಬ್ಯಾಂಕಿಂಗ್</p>
-            <p className="lobby-phase">
-              {phase === "idle" && "ಸಿದ್ಧ · Waiting for customer"}
-              {phase === "greeting" && `${activeGreet.title_kn}…`}
-              {phase === "conversation" && "ಕೈ ಬಳಸದೆ · Hands-free"}
-            </p>
+            <p className="lobby-phase">{inSession ? "ಕೈ ಬಳಸದೆ ಮಾತನಾಡಿ" : "ಸಿದ್ಧ · ಗ್ರಾಹಕರಿಗಾಗಿ ಕಾಯುತ್ತಿದೆ"}</p>
           </div>
         </div>
         <div className="lobby-top-actions">
-          <span className="lobby-chip">{slotLabel}</span>
+          {inSession ? (
+            <span
+              className={`lobby-chip lobby-timer${overtime ? " is-over" : ""}`}
+              title={`ಗುರಿ ${formatDuration(SESSION_TARGET_S)} ನಿಮಿಷ`}
+            >
+              ⏱ {formatDuration(elapsedS)}
+              {overtime
+                ? ` · +${formatDuration(elapsedS - SESSION_TARGET_S)}`
+                : ` / ${formatDuration(SESSION_TARGET_S)}`}
+            </span>
+          ) : (
+            <span className="lobby-chip">{slotLabel}</span>
+          )}
           {inSession && (
             <button type="button" className="danger-btn lobby-end-btn" onClick={() => void handleEnd()}>
-              End
+              ಮುಗಿಸಿ
             </button>
           )}
         </div>
       </header>
 
-      {(error || apiOnline === false || (cameraError && phase === "conversation")) && (
+      {(error || apiOnline === false) && (
         <div className="lobby-alert" role="status">
-          <p className="lobby-alert-text">
-            {apiOnline === false
-              ? "API offline — check server on port 8000 and refresh (or wait if processing audio)"
-              : (error ?? cameraError)}
-          </p>
-          {cameraError && (
-            <button type="button" className="lobby-alert-btn" onClick={retryCamera}>
-              Retry camera
-            </button>
-          )}
+          <p className="lobby-alert-text">{SERVICE_DOWN_KN}</p>
         </div>
       )}
 
-      {/* During greeting the status is shown once, in the stage below. */}
-      {greetStatus && phase !== "greeting" && <p className="lobby-greet-status">{greetStatus}</p>}
-
-      <div className={`lobby-body lobby-body-${phase}`}>
-        {(phase === "idle" || phase === "greeting") && (
+      <div className={`lobby-body lobby-body-${inSession ? "conversation" : phase}`}>
+        {!inSession && (
           <>
-            <main className={`lobby-stage lobby-stage-${phase}`}>
+            <main className="lobby-stage lobby-stage-idle">
               <div className="lobby-hero-bot">
-                {phase === "idle" && <span className="lobby-pulse-ring" aria-hidden />}
-                <LobbyBot
-                  mood={phase === "greeting" ? "greeting" : "ready"}
-                  className="lobby-bot-hero"
-                />
+                <span className="lobby-pulse-ring" aria-hidden />
+                <LobbyBot mood="ready" className="lobby-bot-hero" />
               </div>
               <div className="lobby-invite">
                 <p className="lobby-invite-kicker">{slotLabel}</p>
                 <h1>{activeGreet.title_kn}</h1>
-                {phase === "idle" ? (
-                  <>
-                    <p className="lobby-invite-kn">ಕ್ಯಾಮೆರಾದ ಎದುರು ನಿಂತು ಪ್ರಾರಂಭಿಸಿ</p>
-                    <p className="lobby-invite-en">Tap once for sound, then step into view.</p>
-                    <button type="button" className="lobby-cta" onClick={() => void handleManualStart()}>
-                      ಪ್ರಾರಂಭಿಸಿ · Start
-                    </button>
-                    {/* Collapsed: opened by default it pushed the robot off-screen on 1080p. */}
-                    <SpeakGuideCard compact />
-                  </>
-                ) : (
-                  <>
-                    <p className="lobby-invite-kn">{activeGreet.line_kn}</p>
-                    <p className="lobby-invite-en">{activeGreet.line_en}</p>
-                    <p className="lobby-invite-wait">
-                      {greetStatus ?? "ಧ್ವನಿ ಸಿದ್ಧಪಡಿಸಲಾಗುತ್ತಿದೆ — ಕಾಯಿರಿ · Preparing voice — please wait"}
-                    </p>
-                  </>
-                )}
+                <p className="lobby-invite-kn">ಪ್ರಾರಂಭಿಸಲು ಕೆಳಗಿನ ಬಟನ್ ಒತ್ತಿ</p>
+                <button type="button" className="lobby-cta" onClick={() => void handleManualStart()}>
+                  ಪ್ರಾರಂಭಿಸಿ
+                </button>
+                {/* Collapsed: opened by default it pushed the robot off-screen on 1080p. */}
+                <SpeakGuideCard compact />
               </div>
             </main>
-
-            <aside className="lobby-presence">
-              <div
-                className={[
-                  "lobby-camera-wrap lobby-camera-presence",
-                  presence === "present" ? "lobby-camera-live" : "",
-                  cameraError ? "is-error" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <video ref={videoRef} className="lobby-video" playsInline muted autoPlay />
-                <canvas ref={canvasRef} className="lobby-canvas-hidden" />
-                <div className="lobby-camera-veil" aria-hidden />
-                <div className="lobby-camera-badge">
-                  {presence === "present" ? "Detected" : cameraError ? "Offline" : "Looking…"}
-                </div>
-              </div>
-              <div className="lobby-presence-meta">
-                <p className="lobby-presence-title">
-                  {presence === "present" ? "ಗ್ರಾಹಕರು ಬಂದಿದ್ದಾರೆ" : "Presence window"}
-                </p>
-                <p className="lobby-presence-hint">
-                  {cameraError
-                    ? "Camera busy — close other apps, then retry."
-                    : "Stand in this frame to begin the Kannada greeting."}
-                </p>
-                {cameraError && (
-                  <button type="button" className="lobby-alert-btn" onClick={retryCamera}>
-                    Retry camera
-                  </button>
-                )}
-              </div>
-            </aside>
           </>
         )}
 
-        {phase === "conversation" && (
+        {inSession && (
           <div className="convo">
-            <aside className="convo-side">
-              <LobbyBot mood={convoMood} className="convo-bot" />
-              {/* Must stay mounted: presence detection ends the session when the customer leaves. */}
-              <div
-                className={[
-                  "convo-camera",
-                  presence === "present" ? "is-live" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <video ref={videoRef} className="lobby-video" playsInline muted autoPlay />
-                <canvas ref={canvasRef} className="lobby-canvas-hidden" />
-                <span className="convo-camera-badge">
-                  {presence === "present" ? "ಕಾಣುತ್ತಿದ್ದೀರಿ · In view" : `Cam · ${detectorMode}`}
-                </span>
-              </div>
-            </aside>
-            <main className="convo-main">
-              <HandsFreeConversation
-                active={phase === "conversation"}
-                apiOnline={apiOnline}
-                kioskSessionId={status?.current_session_id ?? null}
-                skipInitialPrompt
-                onRequestEnd={(reason) => void handleEnd(reason)}
-                onTurnChange={(turn) => setConvoMood(mapTurnToMood(turn))}
-                onFormModeChange={(inForm) => {
-                  formModeActive.current = inForm;
-                }}
-              />
-            </main>
+            <HandsFreeConversation
+              active={phase === "conversation"}
+              apiOnline={apiOnline}
+              greeting={sessionGreeting}
+              kioskSessionId={status?.current_session_id ?? null}
+              onRequestEnd={(reason) => void handleEnd(reason)}
+              onTurnChange={(turn) => setConvoMood(mapTurnToMood(turn))}
+              presence={
+                <div className="convo-presence">
+                  <LobbyBot mood={convoMood} className="convo-bot" />
+                </div>
+              }
+            />
           </div>
         )}
       </div>

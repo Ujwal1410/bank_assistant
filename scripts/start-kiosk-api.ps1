@@ -20,10 +20,15 @@ if (Test-Path ".env") {
 $remote = $env:BANK_TTS_REMOTE_URL
 if ($remote) {
     Write-Host "==> Remote TTS configured: $remote" -ForegroundColor Cyan
-    Write-Host "    Waiting for TTS ready before starting API..."
-    & "$PSScriptRoot\wait-for-tts-ready.ps1" -Url $remote.TrimEnd('/')
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "WARN: TTS not ready - API will start but speak may fail until TTS warms up." -ForegroundColor Yellow
+    # One quick check only — the API starts either way. While the voice server is down
+    # the kiosk speaks with Sarvam (if a key is set); switch Speaking back to
+    # Open-source in Settings once the server is up.
+    try {
+        $null = Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 -Uri "$($remote.TrimEnd('/'))/api/health"
+        Write-Host "    Voice server is up." -ForegroundColor Green
+    }
+    catch {
+        Write-Host "    Voice server is offline - starting anyway (Sarvam voice is used until it is back)." -ForegroundColor Yellow
     }
 }
 else {

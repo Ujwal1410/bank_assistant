@@ -5,15 +5,14 @@ import {
   fetchFormSubmissions,
   fetchKioskStatus,
   fetchKioskStatusLite,
-  fetchSystemHealth,
   startKiosk,
   stopKiosk,
   type FormSubmissionItem,
   type HistoryItem,
   type KioskStatus,
-  type SystemHealth,
 } from "../../api/client";
 import { startVisibilityAwarePoll } from "../../utils/polling";
+import { SESSION_TARGET_S, formatDuration, sessionSeconds } from "../../utils/sessionTime";
 import {
   Badge,
   Card,
@@ -47,8 +46,6 @@ export function Overview({ apiOnline, onNavigate, onOpenLobby }: OverviewProps) 
   const [status, setStatus] = useState<KioskStatus | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [forms, setForms] = useState<FormSubmissionItem[]>([]);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
-  const [healthErr, setHealthErr] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
@@ -78,29 +75,19 @@ export function Overview({ apiOnline, onNavigate, onOpenLobby }: OverviewProps) 
       /* keep last */
     }
   }, []);
-  const loadHealth = useCallback(async () => {
-    try {
-      setHealth(await fetchSystemHealth());
-      setHealthErr(false);
-    } catch {
-      setHealthErr(true);
-    }
-  }, []);
 
   useEffect(() => {
     void loadStatus(true);
     void loadActivity();
     void loadForms();
-    void loadHealth();
     const stops = [
       startVisibilityAwarePoll(() => loadStatus(false), 5000, 20000),
       startVisibilityAwarePoll(() => loadStatus(true), 20000, 60000),
       startVisibilityAwarePoll(() => loadActivity(), 15000, 60000),
       startVisibilityAwarePoll(() => loadForms(), 30000, 90000),
-      startVisibilityAwarePoll(() => loadHealth(), 20000, 60000),
     ];
     return () => stops.forEach((stop) => stop());
-  }, [loadStatus, loadActivity, loadForms, loadHealth]);
+  }, [loadStatus, loadActivity, loadForms]);
 
   const act = async (fn: () => Promise<KioskStatus>, ok: string) => {
     setBusy(true);
@@ -144,14 +131,13 @@ export function Overview({ apiOnline, onNavigate, onOpenLobby }: OverviewProps) 
   const state = lobbyState(status);
   const running = status?.running ?? false;
   const inSession = Boolean(status?.current_session_id);
-  const remote = health?.tts?.remote;
-  const ttsHost = (() => {
-    try {
-      return remote?.url ? new URL(remote.url).host : "local";
-    } catch {
-      return remote?.url ?? "local";
-    }
-  })();
+  const recentSessions = (status?.sessions ?? []).slice(0, 6);
+  // Ticks the duration of a session that is still running.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNowMs(Date.now()), 15000);
+    return () => window.clearInterval(id);
+  }, []);
 
   return (
     <div className="ac-page">
@@ -275,48 +261,31 @@ export function Overview({ apiOnline, onNavigate, onOpenLobby }: OverviewProps) 
         </Card>
 
         <div className="ac-stack">
-          {/* System health */}
-          <Card title="System health" titleKn="ವ್ಯವಸ್ಥೆಯ ಸ್ಥಿತಿ">
-            <ul className="ac-health">
-              <li>
-                <span className={`ac-health-dot ${apiOnline ? "is-ok" : apiOnline === false ? "is-bad" : ""}`} />
-                <span className="ac-health-name">Kiosk service</span>
-                <span className="ac-health-val">{apiOnline ? "Online" : apiOnline === false ? "Offline" : "…"}</span>
-              </li>
-              <li>
-                <span className={`ac-health-dot ${health?.pipeline_worker ? "is-ok" : healthErr ? "is-bad" : ""}`} />
-                <span className="ac-health-name">Speech understanding</span>
-                <span className="ac-health-val">{health ? (health.pipeline_worker ? "Ready" : "Starting") : healthErr ? "Unknown" : "…"}</span>
-              </li>
-              <li>
-                <span
-                  className={`ac-health-dot ${
-                    remote?.configured ? (remote.ready ? "is-ok" : remote.healthy ? "is-warn" : "is-bad") : health?.tts?.ready ? "is-ok" : ""
-                  }`}
-                />
-                <span className="ac-health-name">Voice (TTS) · {ttsHost}</span>
-                <span className="ac-health-val">
-                  {!health
-                    ? healthErr
-                      ? "Unknown"
-                      : "…"
-                    : remote?.configured
-                      ? remote.ready
-                        ? "Ready"
-                        : remote.healthy
-                          ? "Warming up"
-                          : "Unreachable"
-                      : health.tts?.ready
-                        ? "Ready"
-                        : "Not ready"}
-                </span>
-              </li>
-              <li>
-                <span className="ac-health-dot is-ok" />
-                <span className="ac-health-name">Assistant voice</span>
-                <span className="ac-health-val">{health?.tts?.speaker ?? "—"}</span>
-              </li>
-            </ul>
+          {/* Customer sessions — how long each visit took (target 3 minutes). */}
+          <Card title="Customer sessions" titleKn="ಗ್ರಾಹಕರ ಭೇಟಿಯ ಅವಧಿ" flush>
+            {recentSessions.length === 0 ? (
+              <Empty icon="⏱" title="No sessions yet" hint={`Each visit's duration shows here (target ${formatDuration(SESSION_TARGET_S)}).`} />
+            ) : (
+              <ul className="ac-feed">
+                {recentSessions.map((s) => {
+                  const secs = sessionSeconds(s, nowMs);
+                  const over = secs !== null && secs > SESSION_TARGET_S;
+                  return (
+                    <li key={s.id} className={over ? "is-attention" : ""}>
+                      <span className="ac-feed-time">{timeOnly(s.started_at)}</span>
+                      <div className="ac-feed-main">
+                        <p className="ac-feed-said">
+                          {secs === null ? "—" : formatDuration(secs)}
+                          {!s.ended_at && " · in progress"}
+                        </p>
+                        <p className="ac-feed-en">{over ? `Over ${formatDuration(SESSION_TARGET_S)} target` : s.note || "Within target"}</p>
+                      </div>
+                      <Badge tone={over ? "amber" : "green"}>{over ? "Long" : "OK"}</Badge>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
           </Card>
 
           {/* What customers ask */}

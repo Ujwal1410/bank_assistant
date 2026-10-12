@@ -76,6 +76,8 @@ const CONSONANTS: Record<string, string> = {
 };
 
 const VIRAMA = "್";
+/** ಂ is "m" before these (ಸಂಪತ್ → Sampat) and "n" elsewhere (ಬಂಟ್ವಾಳ → Bantwala). */
+const LABIALS = new Set(["ಪ", "ಫ", "ಬ", "ಭ", "ಮ"]);
 const ANUSVARA = "ಂ";
 const VISARGA = "ಃ";
 
@@ -115,7 +117,8 @@ export function transliterateKannadaToEnglish(raw: string): string {
       i += 1;
       // Consonant cluster with virama
       while (i < chars.length && chars[i] === VIRAMA && i + 1 < chars.length && CONSONANTS[chars[i + 1]]) {
-        base += CONSONANTS[chars[i + 1]];
+        // ವ joined to a consonant sounds "w" (ಉಜ್ವಲ್ → Ujwal, ಸ್ವಾಮಿ → Swami).
+        base += chars[i + 1] === "ವ" ? "w" : CONSONANTS[chars[i + 1]];
         i += 2;
       }
       if (i < chars.length && chars[i] === VIRAMA) {
@@ -132,7 +135,7 @@ export function transliterateKannadaToEnglish(raw: string): string {
     }
 
     if (ch === ANUSVARA) {
-      out += "m";
+      out += LABIALS.has(chars[i + 1] ?? "") ? "m" : "n";
       i += 1;
       continue;
     }

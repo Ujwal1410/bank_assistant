@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import {
   base64ToAudioUrl,
   fetchSpeakKannada,
-  fetchSystemHealth,
   fetchVoiceSettings,
   updateVoiceSpeaker,
-  type SystemHealth,
   type VoiceOption,
 } from "../../api/client";
 import { unlockAudio } from "../../utils/playAudio";
@@ -27,7 +25,6 @@ export function Settings({ apiOnline, username, onSignOut }: SettingsProps) {
   const [previewing, setPreviewing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
-  const [health, setHealth] = useState<SystemHealth | null>(null);
 
   useEffect(() => {
     fetchVoiceSettings()
@@ -36,9 +33,6 @@ export function Settings({ apiOnline, username, onSignOut }: SettingsProps) {
         setSpeaker(d.speaker);
       })
       .catch((err) => setError(err instanceof Error ? err.message : "Voice settings unavailable"));
-    fetchSystemHealth()
-      .then(setHealth)
-      .catch(() => undefined);
   }, []);
 
   const choose = async (id: string) => {
@@ -72,8 +66,6 @@ export function Settings({ apiOnline, username, onSignOut }: SettingsProps) {
       setPreviewing(null);
     }
   };
-
-  const remote = health?.tts?.remote;
 
   return (
     <div className="ac-page">
@@ -134,43 +126,6 @@ export function Settings({ apiOnline, username, onSignOut }: SettingsProps) {
       <SpeechEngines apiOnline={apiOnline} />
 
       <div className="ac-grid ac-grid--2">
-        <Card title="System" titleKn="ವ್ಯವಸ್ಥೆ">
-          <dl className="ac-kv">
-            <div>
-              <dt>Kiosk service</dt>
-              <dd>
-                <Badge tone={apiOnline ? "green" : apiOnline === false ? "red" : "slate"}>
-                  {apiOnline ? "Online" : apiOnline === false ? "Offline" : "Checking…"}
-                </Badge>
-              </dd>
-            </div>
-            <div>
-              <dt>Speech understanding</dt>
-              <dd>{health ? (health.pipeline_worker ? "Warm worker (fast)" : "On demand") : "—"}</dd>
-            </div>
-            <div>
-              <dt>Voice server</dt>
-              <dd>{remote?.configured ? remote.url : "This machine"}</dd>
-            </div>
-            <div>
-              <dt>Voice server status</dt>
-              <dd>
-                {remote?.configured ? (
-                  <Badge tone={remote.ready ? "green" : remote.healthy ? "amber" : "red"}>
-                    {remote.ready ? "Ready" : remote.healthy ? "Warming up" : "Unreachable"}
-                  </Badge>
-                ) : (
-                  "—"
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>Pre-cached phrases</dt>
-              <dd>{remote?.warmup?.phrases_cached ?? "—"}</dd>
-            </div>
-          </dl>
-        </Card>
-
         <Card title="Your session" titleKn="ನಿಮ್ಮ ಲಾಗಿನ್">
           <dl className="ac-kv">
             <div>

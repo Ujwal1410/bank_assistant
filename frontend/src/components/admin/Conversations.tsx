@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   base64ToAudioUrl,
+  clearHistory,
   fetchAdminHistory,
   fetchAdminHistoryItem,
   type HistoryItem,
@@ -9,6 +10,7 @@ import { startVisibilityAwarePoll } from "../../utils/polling";
 import {
   Badge,
   Card,
+  ClearAllButton,
   ConfidenceBar,
   Empty,
   ErrorNote,
@@ -71,6 +73,20 @@ export function Conversations({ apiOnline }: { apiOnline: boolean | null }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<HistoryItem | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const clearAll = async () => {
+    try {
+      const n = await clearHistory();
+      setSelectedId(null);
+      setItems([]);
+      setError(null);
+      setNotice(`Deleted ${n} conversation${n === 1 ? "" : "s"} and their recordings`);
+      window.setTimeout(() => setNotice(null), 3200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear conversations");
+    }
+  };
 
   const refresh = useCallback(async () => {
     if (apiOnline === false) return;
@@ -177,10 +193,12 @@ export function Conversations({ apiOnline }: { apiOnline: boolean | null }) {
           <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => void refresh()} title="Refresh">
             <Icon name="refresh" size={16} />
           </button>
+          <ClearAllButton what="conversations and their recordings" count={items.length} onClear={clearAll} />
         </div>
       </div>
 
       {error && <ErrorNote message={error} />}
+      {notice && <p className="ac-toast">{notice}</p>}
 
       <div className={`ac-split ${detail ? "has-detail" : ""}`}>
         <Card flush className="ac-split-list">
