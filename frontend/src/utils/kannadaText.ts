@@ -117,7 +117,7 @@ export function transliterateKannadaToEnglish(raw: string): string {
       i += 1;
       // Consonant cluster with virama
       while (i < chars.length && chars[i] === VIRAMA && i + 1 < chars.length && CONSONANTS[chars[i + 1]]) {
-        // ವ joined to a consonant sounds "w" (ಉಜ್ವಲ್ → Ujwal, ಸ್ವಾಮಿ → Swami).
+        // ವ joined to a consonant sounds "w" (ಅಶ್ವಿನ್ → Ashwin, ಸ್ವಾಮಿ → Swami).
         base += chars[i + 1] === "ವ" ? "w" : CONSONANTS[chars[i + 1]];
         i += 2;
       }

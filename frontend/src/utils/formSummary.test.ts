@@ -5,7 +5,7 @@ import { normalizeSpokenNumber } from "./kannadaNumbers";
 
 describe("details shown in Kannada", () => {
   it("names use what the customer said", () => {
-    expect(kannadaDisplayValue("full_name", "text", "Ujwal", "ಉಜ್ವಲ್")).toBe("ಉಜ್ವಲ್");
+    expect(kannadaDisplayValue("full_name", "text", "Ashwin", "ಅಶ್ವಿನ್")).toBe("ಅಶ್ವಿನ್");
   });
   it("fixed choices are translated", () => {
     expect(kannadaDisplayValue("account_type", "text", "Savings", "")).toBe("ಉಳಿತಾಯ ಖಾತೆ");

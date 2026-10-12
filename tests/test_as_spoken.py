@@ -16,14 +16,14 @@ from backend.forms.extract import extract_field_value
 @pytest.mark.parametrize(
     ("kannada", "expected"),
     [
-        ("ಉಜ್ವಲ್", "Ujwal"),            # ವ joined to a consonant → w
+        ("ಅಶ್ವಿನ್", "Ashwin"),            # ವ joined to a consonant → w
         ("ಬಂಟ್ವಾಳ", "Bantwala"),         # ಂ before ಟ → n
         ("ಮಂಗಳೂರು", "Mangaluru"),
         ("ಸಂಪತ್ ಕುಮಾರ್", "Sampat Kumar"),  # ಂ before ಪ → m
         ("ಸ್ವಾಮಿ", "Swami"),
         ("ರಮೇಶ್ ಕುಮಾರ್", "Ramesh Kumar"),
         ("ಮನೆ ಸಂಖ್ಯೆ ೧೨", "Mane Sankhye 12"),
-        ("Ujwal", "Ujwal"),              # already English letters
+        ("Ashwin", "Ashwin"),              # already English letters
     ],
 )
 def test_transliteration(kannada: str, expected: str) -> None:
@@ -33,10 +33,10 @@ def test_transliteration(kannada: str, expected: str) -> None:
 @pytest.mark.parametrize(
     ("heard", "value", "spoken_kn"),
     [
-        ("ನನ್ನ ಹೆಸರು ಉಜ್ವಲ್", "Ujwal", "ಉಜ್ವಲ್"),
-        ("ಉಜ್ವಲ್ ಅಂತ", "Ujwal", "ಉಜ್ವಲ್"),
+        ("ನನ್ನ ಹೆಸರು ಅಶ್ವಿನ್", "Ashwin", "ಅಶ್ವಿನ್"),
+        ("ಅಶ್ವಿನ್ ಅಂತ", "Ashwin", "ಅಶ್ವಿನ್"),
         ("ನನ್ನ ವಿಳಾಸ ಬಂಟ್ವಾಳ.", "Bantwala", "ಬಂಟ್ವಾಳ"),
-        ("my name is Ujwal", "Ujwal", "Ujwal"),
+        ("my name is Ashwin", "Ashwin", "Ashwin"),
     ],
 )
 def test_lead_ins_and_endings_are_dropped(heard: str, value: str, spoken_kn: str) -> None:
@@ -53,7 +53,7 @@ def test_which_fields_are_kept_as_spoken() -> None:
 
 def test_names_and_addresses_ignore_the_translation() -> None:
     # The real failures from kiosk testing: translation turned these into English words.
-    assert extract_field_value("Be Aware", "text", "full_name", kannada_text="ಉಜ್ವಲ್") == "Ujwal"
+    assert extract_field_value("Be Aware", "text", "full_name", kannada_text="ಅಶ್ವಿನ್") == "Ashwin"
     assert (
         extract_field_value("We've come to", "text", "address", kannada_text="ಬಂಟ್ವಾಳ")
         == "Bantwala"

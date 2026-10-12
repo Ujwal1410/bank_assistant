@@ -4,7 +4,7 @@ Names and addresses are kept as the customer said them — never translated.
 Translating a name or a place produces nonsense ("ಬುಜ್ಜಿರಿ" → "Be Aware",
 "ನಾವು ಬಂದ" → "We've come to"). These fields take the Kannada the speech
 model heard, drop lead-ins such as "ನನ್ನ ಹೆಸರು", and spell it in English
-letters for the printed form (ಉಜ್ವಲ್ → "Ujwal", ಬಂಟ್ವಾಳ → "Bantwala").
+letters for the printed form (ಅಶ್ವಿನ್ → "Ashwin", ಬಂಟ್ವಾಳ → "Bantwala").
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def transliterate_kannada(text: str) -> str:
 
     Spelling rules that matter for names and places:
       ಂ before ಪ/ಫ/ಬ/ಭ/ಮ is "m", otherwise "n"   (ಸಂಪತ್ → Sampat, ಬಂಟ್ವಾಳ → Bantwala)
-      ವ joined to a consonant is "w"               (ಉಜ್ವಲ್ → Ujwal, ಸ್ವಾಮಿ → Swami)
+      ವ joined to a consonant is "w"               (ಅಶ್ವಿನ್ → Ashwin, ಸ್ವಾಮಿ → Swami)
     """
     text = (text or "").strip().translate(_KN_DIGITS)
     if not text:

@@ -47,7 +47,7 @@ def extract_date_from_kannada(text: str) -> str:
 
     normalized = text.translate(_KN_DIGITS)
 
-    # Handles "14 10 2003", "14/10/2003", and correction sentences containing it.
+    # Handles "21 06 2005", "21/06/2005", and correction sentences containing it.
     numeric = re.search(
         r"(?<!\d)(\d{1,2})\s*[/.\-\s]\s*(\d{1,2})\s*[/.\-\s]\s*(\d{4})(?!\d)",
         normalized,
@@ -65,7 +65,7 @@ def extract_date_from_kannada(text: str) -> str:
             return parsed
 
     # Handles grouped Kannada speech such as
-    # "ಹದಿನಾಲ್ಕು ಹತ್ತು ಎರಡು ಸಾವಿರ ಮೂರು".
+    # "ಇಪ್ಪತ್ತೊಂದು ಆರು ಎರಡು ಸಾವಿರ ಐದು".
     cleaned = re.sub(r"[^\u0c80-\u0cff\s]", " ", normalized)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     values = [number for _start, _end, number in _number_matches(cleaned)]

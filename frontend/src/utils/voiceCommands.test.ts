@@ -23,11 +23,11 @@ describe("voice commands — Kannada", () => {
 
   // Names, places and numbers spoken as a correction must not be read as yes / no.
   // These all matched before, because vowel signs were stripped before comparing.
-  it.each(["ಸರಿತಾ", "ಸರಸ್ವತಿ", "ಉಜ್ವಲ್", "ಬಂಟ್ವಾಳ", "ಹದಿನಾಲ್ಕು ಹತ್ತು"])("%s is not yes", (text) => {
+  it.each(["ಸರಿತಾ", "ಸರಸ್ವತಿ", "ಅಶ್ವಿನ್", "ಬಂಟ್ವಾಳ", "ಇಪ್ಪತ್ತೊಂದು ಆರು"])("%s is not yes", (text) => {
     expect(isAffirmCommand(text)).toBe(false);
   });
 
-  it.each(["ಇಲ್ಲಿ ಬನ್ನಿ", "ಮತ್ತೂರು", "ಉಜ್ವಲ್", "ಬಂಟ್ವಾಳ"])("%s is not no", (text) => {
+  it.each(["ಇಲ್ಲಿ ಬನ್ನಿ", "ಮತ್ತೂರು", "ಅಶ್ವಿನ್", "ಬಂಟ್ವಾಳ"])("%s is not no", (text) => {
     expect(isRejectCommand(text)).toBe(false);
   });
 });

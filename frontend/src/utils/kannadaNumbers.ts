@@ -413,8 +413,8 @@ export function normalizeSpokenNumber(
   const text = raw.trim();
   if (!text) return "";
 
-  // A date the backend already parsed ("14/10/2003") must keep its separators —
-  // reducing it to "14102003" made /api/forms/submit reject the whole form.
+  // A date the backend already parsed ("21/06/2005") must keep its separators —
+  // reducing it to "21062005" made /api/forms/submit reject the whole form.
   if (mode === "date") {
     const dmy = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\.?$/);
     if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;

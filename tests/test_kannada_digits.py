@@ -1,6 +1,9 @@
 """Model-independent tests for spoken numeric capture and validation."""
 
+import pytest
+
 from backend.forms.date_kn import extract_date_from_kannada
+from backend.forms.extract import extract_field_value
 from backend.forms.kannada_digits import extract_digits_from_kannada
 from backend.forms.validation import validate_captured_value
 from backend.forms.stt_tuning import plausible_digit_capture
@@ -81,18 +84,18 @@ def test_cheque_leaf_choices_are_constrained() -> None:
 
 
 def test_extracts_numeric_and_spoken_kannada_dates() -> None:
-    assert extract_date_from_kannada("14 10 2003") == "14/10/2003"
-    assert extract_date_from_kannada("ನಾನು ಹೇಳಿದ್ದು 14 10 2003") == "14/10/2003"
+    assert extract_date_from_kannada("21 06 2005") == "21/06/2005"
+    assert extract_date_from_kannada("ನಾನು ಹೇಳಿದ್ದು 21 06 2005") == "21/06/2005"
     assert (
-        extract_date_from_kannada("ಹದಿನಾಲ್ಕು ಹತ್ತು ಎರಡು ಸಾವಿರ ಮೂರು")
-        == "14/10/2003"
+        extract_date_from_kannada("ಇಪ್ಪತ್ತೊಂದು ಆರು ಎರಡು ಸಾವಿರ ಐದು")
+        == "21/06/2005"
     )
 
 
 def test_date_validation_rejects_garbage_and_impossible_dates() -> None:
     assert (
         validate_captured_value(
-            "14/10/2003",
+            "21/06/2005",
             field_type="date",
             field_id="date_of_birth",
         )
@@ -104,7 +107,7 @@ def test_date_validation_rejects_garbage_and_impossible_dates() -> None:
         field_id="date_of_birth",
     )
     assert validate_captured_value(
-        "31/02/2003",
+        "31/02/2005",
         field_type="date",
         field_id="date_of_birth",
     )
@@ -134,3 +137,18 @@ def test_form_stt_hints_are_short_and_length_neutral() -> None:
     for ftype, fid in (("text", "address"), ("amount", "amount"), ("text", "confirm")):
         prompt, hot = form_fill_stt_hints(ftype, fid)
         assert prompt and len(prompt) < 60 and hot is None
+
+
+@pytest.mark.parametrize(
+    ("spoken", "date"),
+    [
+        ("twenty one six two thousand five", "21/06/2005"),  # was read as 20/07/2005
+        ("thirty one twelve two thousand", "31/12/2000"),
+        ("twenty two two two thousand five", "22/02/2005"),
+        ("twenty ten two thousand three", "20/10/2003"),       # "twenty" alone is the day
+        ("twenty five twelve nineteen ninety five", "25/12/1995"),
+        ("fifteen eight two thousand ten", "15/08/2010"),
+    ],
+)
+def test_english_word_dates_with_two_word_days(spoken: str, date: str) -> None:
+    assert extract_field_value(spoken, "date", "date_of_birth") == date
