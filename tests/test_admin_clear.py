@@ -45,7 +45,7 @@ def test_clear_conversations_deletes_rows_and_recordings(temp_history):
 
 
 def test_clear_form_submissions(temp_submissions):
-    for name in ("Ujwal", "Suresh"):
+    for name in ("Ashwin", "Suresh"):
         store.save_form_submission("cash_deposit", "ನಗದು", "Cash", {"full_name": name})
     assert len(store.list_form_submissions()) == 2
     assert forms_routes.clear_submissions({}) == {"ok": True, "deleted": 2}

@@ -8,12 +8,12 @@ from backend.forms.extract import _extract_date
 
 tests = [
     # Exact failing inputs from logs
-    ('fourteen ten two thousand three',     '14/10/2003'),
-    ('Fourteen ten two thousand three.',    '14/10/2003'),
-    ('fourteen ten two thousand three',     '14/10/2003'),
+    ('twenty one six two thousand five',     '21/06/2005'),
+    ('Twenty one six two thousand five.',    '21/06/2005'),
+    ('twenty one six two thousand five',     '21/06/2005'),
     # Already-digit formats — must still work
-    ('14/10/2003',                          '14/10/2003'),
-    ('14-10-2003',                          '14/10/2003'),
+    ('21/06/2005',                          '21/06/2005'),
+    ('21-06-2005',                          '21/06/2005'),
     # Other common word patterns
     ('twenty five twelve nineteen ninety five', '25/12/1995'),
     ('fifteen eight two thousand ten',      '15/08/2010'),
