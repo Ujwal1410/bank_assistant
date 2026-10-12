@@ -54,7 +54,7 @@ export function AgentMascot({ mood = "waiting", className = "" }: AgentMascotPro
           xmlns="http://www.w3.org/2000/svg"
           role="img"
         >
-          <title>Kannada banking assistant bot</title>
+          <title>ಕನ್ನಡ ಬ್ಯಾಂಕಿಂಗ್ ಸಹಾಯಕ</title>
           <ellipse className="mascot-shadow" cx="100" cy="222" rx="52" ry="9" fill="rgba(0,0,0,0.28)" />
 
           <g className="mascot-body-group">

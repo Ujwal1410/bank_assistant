@@ -150,11 +150,17 @@ def _key_lock(key: str) -> threading.Lock:
     return _KEY_LOCKS[int(key[:8], 16) % len(_KEY_LOCKS)]
 
 
-def _cloud_to_b64(text: str, *, persist: bool, bypass_cache: bool) -> str | None:
+class _RemoteVoiceFailed(Exception):
+    """The open-source voice server did not answer — try the Sarvam backup outside the lock."""
+
+
+def _cloud_to_b64(
+    text: str, *, persist: bool, bypass_cache: bool, backup: bool = False
+) -> str | None:
     """Sarvam voice (cached under its own profile), or None to use the local voice."""
     from backend.tts import cloud_tts_profile, synthesise_kannada_cloud
 
-    profile = cloud_tts_profile()
+    profile = cloud_tts_profile(backup=backup)
     if profile is None:
         return None
     if not bypass_cache:
@@ -169,7 +175,7 @@ def _cloud_to_b64(text: str, *, persist: bool, bypass_cache: bool) -> str | None
             if hit:
                 return hit
         started = time.perf_counter()
-        result = synthesise_kannada_cloud(text)
+        result = synthesise_kannada_cloud(text, backup=backup)
         if result is None:
             return None  # Sarvam failed — caller falls back to the local voice
         audio, sr = result
@@ -203,7 +209,7 @@ def kannada_to_b64(
     if not text:
         return ""
 
-    from backend.tts.remote_bridge import fetch_kannada_b64_remote, remote_tts_configured
+    from backend.tts.remote_bridge import remote_tts_configured, remote_tts_healthy
     from backend.tts.speaker import prepare_kannada_for_tts
 
     # Normalize before cache lookup so "1234…" and spoken Kannada share one clip.
@@ -238,6 +244,49 @@ def kannada_to_b64(
             print("[tts] cache_hit=1", file=sys.stderr, flush=True)
             return hit
 
+    uses_remote = remote_tts_configured() and engine in {"parler", "indic-parler", "auto", "remote"}
+
+    def _sarvam_backup(reason: str) -> str | None:
+        b64 = _cloud_to_b64(text, persist=persist, bypass_cache=bypass_cache, backup=True)
+        if b64:
+            print(f"[tts] voice server {reason} — Sarvam voice used", file=sys.stderr, flush=True)
+        return b64
+
+    # Voice server down → speak with Sarvam (if a key works) instead of failing.
+    if uses_remote and not remote_tts_healthy(timeout_s=4.0):
+        b64 = _sarvam_backup("offline")
+        if b64:
+            return b64
+
+    try:
+        return _synthesise_locked(
+            text,
+            speaker=speaker,
+            use_parler=use_parler,
+            uses_remote=uses_remote,
+            free_vram=free_vram,
+            persist=persist,
+            bypass_cache=bypass_cache,
+        )
+    except _RemoteVoiceFailed as failed:
+        b64 = _sarvam_backup("failed")
+        if b64:
+            return b64
+        raise failed.__cause__ or failed
+
+
+def _synthesise_locked(
+    text: str,
+    *,
+    speaker: str,
+    use_parler: bool,
+    uses_remote: bool,
+    free_vram: Callable[[], None] | None,
+    persist: bool,
+    bypass_cache: bool,
+) -> str:
+    from backend.tts.remote_bridge import fetch_kannada_b64_remote, remote_tts_configured
+
     key = _cache_key(
         text,
         speaker=speaker if (use_parler or remote_tts_configured()) else None,
@@ -254,18 +303,21 @@ def kannada_to_b64(
                 return hit
 
         # Split deploy: kiosk must use remote GPU box — never load local Parler here.
-        if remote_tts_configured() and engine in {"parler", "indic-parler", "auto", "remote"}:
+        if uses_remote:
             print(
                 f"[tts] remote speak → {os.environ.get('BANK_TTS_REMOTE_URL', '').rstrip('/')} "
                 f"speaker={speaker}",
                 file=sys.stderr,
                 flush=True,
             )
-            b64 = fetch_kannada_b64_remote(text, speaker=speaker)
-            if not b64:
-                raise RuntimeError(
-                    "Remote TTS returned empty audio. Check the configured TTS health endpoint."
-                )
+            try:
+                b64 = fetch_kannada_b64_remote(text, speaker=speaker)
+                if not b64:
+                    raise RuntimeError(
+                        "Remote TTS returned empty audio. Check the configured TTS health endpoint."
+                    )
+            except Exception as exc:
+                raise _RemoteVoiceFailed(str(exc)) from exc
             put_cached_b64(text, b64, speaker=speaker, persist=persist)
             elapsed_ms = round((time.perf_counter() - started) * 1000)
             print(

@@ -261,6 +261,7 @@ def fill_field(wav_path: str, field_type: str = "text", field_id: str = "") -> d
         "kannada_text": resp.get("kannada_text") or "",
         "english_text": resp.get("english_text") or "",
         "value": resp.get("value") or "",
+        "spoken_kn": resp.get("spoken_kn") or "",
         "error": resp.get("error"),
         "validation_error": resp.get("validation_error"),
         "stage_times": resp.get("stage_times") or {},

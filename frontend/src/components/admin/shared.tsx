@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { HistoryItem } from "../../api/client";
 
 /* ── Formatting ─────────────────────────────────────────────────────────── */
@@ -181,6 +181,7 @@ const ICONS: Record<string, string> = {
   external: "M14 4h6v6m0-6l-9 9M10 6H5v13h13v-5",
   logout: "M15 4h4v16h-4M10 16l4-4-4-4m4 4H4",
   refresh: "M20 11a8 8 0 10-2.3 5.7M20 4v7h-7",
+  trash: "M4 7h16M9 7V4h6v3m-8 0l1 13h8l1-13M10 11v6m4-6v6",
   search: "M11 18a7 7 0 100-14 7 7 0 000 14zm9 3l-4.3-4.3",
   play: "M8 5v14l11-7L8 5z",
   print: "M7 8V3h10v5M7 17H4v-7h16v7h-3m-10-3h10v7H7v-7z",
@@ -199,5 +200,39 @@ export function Icon({ name, size = 18 }: { name: keyof typeof ICONS | string; s
         strokeLinejoin="round"
       />
     </svg>
+  );
+}
+
+/** "Clear all" for test data — asks "Are you sure?" first. Disabled when there is nothing to clear. */
+export function ClearAllButton({
+  what,
+  count,
+  onClear,
+}: {
+  what: string;
+  count: number;
+  onClear: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    if (busy || count === 0) return;
+    if (!window.confirm(`Are you sure? This permanently deletes all ${count} ${what}. It cannot be undone.`)) return;
+    setBusy(true);
+    try {
+      await onClear();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <button
+      type="button"
+      className="ac-btn ac-btn--danger ac-btn--sm"
+      disabled={busy || count === 0}
+      onClick={() => void run()}
+      title={`Delete all ${what}`}
+    >
+      <Icon name="trash" size={16} /> {busy ? "Clearing…" : "Clear all"}
+    </button>
   );
 }

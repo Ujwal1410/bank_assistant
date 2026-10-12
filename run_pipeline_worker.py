@@ -217,6 +217,13 @@ def _transcribe(wav: str) -> dict:
     }
 
 
+def _spoken_kn(kannada: str, field_id: str) -> str:
+    """Cleaned Kannada of a name/address answer — read back in Kannada, not English letters."""
+    from backend.forms.as_spoken import clean_spoken, is_as_spoken_field
+
+    return clean_spoken(kannada) if is_as_spoken_field(field_id) else ""
+
+
 def _fill(wav: str, field_type: str, field_id: str) -> dict:
     from backend.forms.extract import extract_field_value
     from backend.stt import transcribe
@@ -291,6 +298,12 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
 
                 value = extract_date_from_kannada(kannada)
 
+            from backend.forms.as_spoken import as_spoken_value, is_as_spoken_field
+
+            if not value and is_as_spoken_field(field_id):
+                # Names / addresses: keep what was said — translating them gives nonsense.
+                value = as_spoken_value(kannada)
+
             if not value:
                 started = time.perf_counter()
                 english = translate_kn_to_en(kannada) or ""
@@ -358,6 +371,7 @@ def _fill(wav: str, field_type: str, field_id: str) -> dict:
         "kannada_text": kannada,
         "english_text": english,
         "value": value,
+        "spoken_kn": _spoken_kn(kannada, field_id),
         "error": error,
         "validation_error": validation_error,
         "stage_times": stage_times,

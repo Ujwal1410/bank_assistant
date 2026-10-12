@@ -28,6 +28,13 @@ from backend.forms.stt_tuning import (
 from backend.stt import transcribe, unload_model as unload_stt
 from backend.translation import translate_kn_to_en, unload_model as unload_trans
 
+def _spoken_kn(kannada_text: str, fid: str) -> str:
+    """Cleaned Kannada of a name/address answer — read back in Kannada, not English letters."""
+    from backend.forms.as_spoken import clean_spoken, is_as_spoken_field
+
+    return clean_spoken(kannada_text) if is_as_spoken_field(fid) else ""
+
+
 wav_path = sys.argv[1]
 field_type = sys.argv[2] if len(sys.argv) > 2 else "text"
 field_id = sys.argv[3] if len(sys.argv) > 3 else ""
@@ -86,6 +93,11 @@ try:
             unload_stt()
         except Exception:
             pass
+        from backend.forms.as_spoken import as_spoken_value, is_as_spoken_field
+
+        if not value and is_as_spoken_field(field_id):
+            # Names / addresses: keep what was said — translating them gives nonsense.
+            value = as_spoken_value(kannada)
         if not value:
             english = translate_kn_to_en(kannada) or ""
             try:
@@ -151,6 +163,7 @@ print(
             "kannada_text": kannada,
             "english_text": english,
             "value": value,
+            "spoken_kn": _spoken_kn(kannada, field_id),
             "error": error,
             "validation_error": validation_error,
             "digit_count": len("".join(ch for ch in value if ch.isdigit())),

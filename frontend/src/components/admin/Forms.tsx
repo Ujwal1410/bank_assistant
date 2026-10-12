@@ -1,8 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchForm, fetchFormSubmissions, type BankForm, type FormSubmissionItem } from "../../api/client";
+import {
+  clearFormSubmissions,
+  fetchForm,
+  fetchFormSubmissions,
+  type BankForm,
+  type FormSubmissionItem,
+} from "../../api/client";
 import { displayFieldValue } from "../../utils/formSummary";
 import { startVisibilityAwarePoll } from "../../utils/polling";
-import { Badge, Card, Empty, ErrorNote, Icon, Loading, relativeDay, dateTime } from "./shared";
+import { Badge, Card, ClearAllButton, Empty, ErrorNote, Icon, Loading, relativeDay, dateTime } from "./shared";
 
 function who(values: Record<string, string>): string {
   return (
@@ -22,6 +28,20 @@ export function Forms({ apiOnline }: { apiOnline: boolean | null }) {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<FormSubmissionItem | null>(null);
   const [schemas, setSchemas] = useState<Record<string, BankForm>>({});
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const clearAll = async () => {
+    try {
+      const n = await clearFormSubmissions();
+      setSelected(null);
+      setItems([]);
+      setError(null);
+      setNotice(`Deleted ${n} form submission${n === 1 ? "" : "s"}`);
+      window.setTimeout(() => setNotice(null), 3200);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear form submissions");
+    }
+  };
 
   const refresh = useCallback(async () => {
     if (apiOnline === false) return;
@@ -94,10 +114,12 @@ export function Forms({ apiOnline }: { apiOnline: boolean | null }) {
           <button type="button" className="ac-btn ac-btn--outline ac-btn--sm" onClick={() => void refresh()} title="Refresh">
             <Icon name="refresh" size={16} />
           </button>
+          <ClearAllButton what="form submissions" count={items.length} onClear={clearAll} />
         </div>
       </div>
 
       {error && <ErrorNote message={error} />}
+      {notice && <p className="ac-toast">{notice}</p>}
 
       <div className={`ac-split ${selected ? "has-detail" : ""}`}>
         <Card flush className="ac-split-list">

@@ -90,13 +90,20 @@ def _save_audio(audio: np.ndarray, sr: int, output_path: str) -> None:
     sf.write(output_path, audio, sr)
 
 
-def cloud_tts_profile() -> str | None:
-    """Cache profile for Sarvam voice output, or None when the local voice is in use."""
+def cloud_tts_profile(*, backup: bool = False) -> str | None:
+    """Cache profile for Sarvam voice output, or None when the local voice is in use.
+
+    ``backup=True``: the open-source voice server is down — use Sarvam if a working key
+    exists, whatever Speaking is set to (None when Sarvam cannot be used either).
+    """
     from backend import cloud
 
-    if not cloud.cloud_selected("tts"):
+    if backup:
+        if not cloud.api_key() or cloud.blocked_reason("tts") is not None:
+            return None
+    elif not cloud.cloud_selected("tts"):
         return None
-    if not cloud.use_cloud("tts"):
+    elif not cloud.use_cloud("tts"):
         if cloud.fallback_allowed():
             return None
         raise cloud.unavailable_error("voice")
@@ -106,11 +113,13 @@ def cloud_tts_profile() -> str | None:
     return f"sarvam|{model}|{cloud.get_config()['sarvam_voice']}"
 
 
-def synthesise_kannada_cloud(kannada_text: str) -> tuple[np.ndarray, int] | None:
+def synthesise_kannada_cloud(
+    kannada_text: str, *, backup: bool = False
+) -> tuple[np.ndarray, int] | None:
     """Sarvam voice for prepared Kannada text, or None to use the local voice."""
     from backend import cloud
 
-    if cloud_tts_profile() is None:
+    if cloud_tts_profile(backup=backup) is None:
         return None
     from backend.cloud import sarvam
 
@@ -121,7 +130,7 @@ def synthesise_kannada_cloud(kannada_text: str) -> tuple[np.ndarray, int] | None
             lambda key: sarvam.synthesise(key, kannada_text, voice=voice),
         )
     except Exception:
-        if cloud.fallback_allowed():
+        if backup or cloud.fallback_allowed():
             return None
         raise
 

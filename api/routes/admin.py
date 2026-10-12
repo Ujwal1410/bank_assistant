@@ -106,8 +106,14 @@ def set_cloud_settings(
 ) -> dict:
     from backend import cloud
 
+    changes = body.model_dump(exclude_none=True)
+    if changes.get("tts") == "local" and not cloud.open_source_voice_online():
+        raise HTTPException(
+            status_code=409,
+            detail="The open-source voice server is offline. Start it first, then switch Speaking to Open-source.",
+        )
     try:
-        cloud.save_config(body.model_dump(exclude_none=True))
+        cloud.save_config(changes)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return {"ok": True, **cloud.public_config()}

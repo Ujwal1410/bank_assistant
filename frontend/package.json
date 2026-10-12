@@ -13,7 +13,8 @@
     "build:admin": "tsc -b && vite build --config vite.admin.config.ts",
     "preview:agent": "vite preview --config vite.config.ts --port 5173 --host",
     "preview:admin": "vite preview --config vite.admin.config.ts --port 5174 --host",
-    "preview:all": "powershell -ExecutionPolicy Bypass -File ./scripts/run-kiosk-prod.ps1"
+    "preview:all": "powershell -ExecutionPolicy Bypass -File ./scripts/run-kiosk-prod.ps1",
+    "test": "vitest run"
   },
   "dependencies": {
     "lottie-react": "^2.4.1",
@@ -28,6 +29,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "selfsigned": "^5.5.0",
     "typescript": "~5.7.2",
-    "vite": "^6.0.3"
+    "vite": "^6.0.3",
+    "vitest": "^3.2.7"
   }
 }

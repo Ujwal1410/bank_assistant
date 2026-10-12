@@ -195,6 +195,15 @@ def clear_queries() -> int:
     return sqlite_history.clear_history()
 
 
+def _submissions_path() -> str:
+    """Local form submissions file (used when MongoDB is not configured)."""
+    return os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+        "data",
+        "form_submissions.jsonl",
+    )
+
+
 def save_form_submission(
     form_id: str,
     title_kn: str,
@@ -221,11 +230,7 @@ def save_form_submission(
     # Local fallback — append JSON lines file
     import json
 
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "data",
-        "form_submissions.jsonl",
-    )
+    path = _submissions_path()
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(doc, ensure_ascii=False) + "\n")
@@ -253,6 +258,21 @@ def save_kiosk_session(event: dict[str, Any]) -> None:
     )
 
 
+def clear_form_submissions() -> int:
+    """Delete every saved form submission (admin "Clear all"). Returns how many were removed."""
+    db = _get_db()
+    if db is not None:
+        return int(db.form_submissions.delete_many({}).deleted_count)
+
+    path = _submissions_path()
+    if not os.path.isfile(path):
+        return 0
+    with open(path, encoding="utf-8") as f:
+        count = sum(1 for line in f if line.strip())
+    os.remove(path)
+    return count
+
+
 def list_form_submissions(limit: int = 50) -> list[dict[str, Any]]:
     db = _get_db()
     if db is not None:
@@ -275,11 +295,7 @@ def list_form_submissions(limit: int = 50) -> list[dict[str, Any]]:
 
     import json
 
-    path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-        "data",
-        "form_submissions.jsonl",
-    )
+    path = _submissions_path()
     if not os.path.isfile(path):
         return []
     out = []

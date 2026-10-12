@@ -366,6 +366,46 @@ export function parseKannadaNumberWords(text: string): number | null {
   return total + current;
 }
 
+const KN_DIGIT_MAP: Record<string, string> = {
+  "೦": "0", "೧": "1", "೨": "2", "೩": "3", "೪": "4", "೫": "5", "೬": "6", "೭": "7", "೮": "8", "೯": "9",
+};
+
+/** Scale of a word after a figure, or 0 when it is not one. */
+function scaleOf(word: string): number {
+  const w = word.toLowerCase();
+  if (/^(crore|ಕೋಟಿ)/.test(w)) return 10_000_000;
+  if (/^million/.test(w)) return 1_000_000;
+  if (/^(lakh|lac|laksha|ಲಕ್ಷ)/.test(w)) return 100_000;
+  if (/^(thousand|saav|sav|ಸಾವಿರ|ಸಾವ್ರ)/.test(w)) return 1000;
+  if (/^(hundred|ನೂರ)/.test(w)) return 100;
+  return 0;
+}
+
+/**
+ * A figure followed by a scale word — "10 ಲಕ್ಷ" → 1000000, "2.5 lakh" → 250000,
+ * "2 ಲಕ್ಷ 50 ಸಾವಿರ" → 250000 (mirrors backend/forms/extract.py `amount_with_scales`).
+ */
+export function amountWithScales(raw: string): string | null {
+  const text = raw.replace(/[೦-೯]/g, (d) => KN_DIGIT_MAP[d]).replace(/(\d),(?=\d)/g, "$1");
+  const re = /(\d+(?:\.\d+)?)\s*([A-Za-z]+|[ಀ-೿]+)/g;
+  let total = 0;
+  let found = false;
+  let smallest = Infinity;
+  let lastEnd = 0;
+  for (const m of text.matchAll(re)) {
+    const scale = scaleOf(m[2]);
+    if (!scale) continue;
+    total += parseFloat(m[1]) * scale;
+    smallest = Math.min(smallest, scale);
+    lastEnd = (m.index ?? 0) + m[0].length;
+    found = true;
+  }
+  if (!found) return null;
+  const tail = text.slice(lastEnd).match(/^\s*(?:and\s+|ಮತ್ತು\s+)?(\d+)\b/);
+  if (tail && Number(tail[1]) < smallest) total += Number(tail[1]);
+  return String(Math.round(total));
+}
+
 export function normalizeSpokenNumber(
   raw: string,
   mode: "digits" | "amount" | "date",
@@ -378,6 +418,11 @@ export function normalizeSpokenNumber(
   if (mode === "date") {
     const dmy = text.match(/^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})\.?$/);
     if (dmy) return `${dmy[1].padStart(2, "0")}/${dmy[2].padStart(2, "0")}/${dmy[3]}`;
+  }
+
+  if (mode === "amount") {
+    const scaled = amountWithScales(text);
+    if (scaled) return scaled;
   }
 
   const literal = extractLiteralDigits(text);

@@ -232,16 +232,37 @@ export async function fetchHistoryItem(id: number | string): Promise<HistoryItem
 }
 
 export async function deleteHistoryItem(id: number | string): Promise<void> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
   const res = await fetchWithTimeout(`${API_BASE}/api/history/${id}`, {
     method: "DELETE",
+    headers: adminAuthHeaders(),
     timeoutMs: 15000,
   });
   if (!res.ok) throw new Error("Failed to delete history item");
 }
 
-export async function clearHistory(): Promise<void> {
-  const res = await fetchWithTimeout(`${API_BASE}/api/history`, { method: "DELETE", timeoutMs: 15000 });
-  if (!res.ok) throw new Error("Failed to clear history");
+/** Admin: delete every conversation and its recording. Returns how many were removed. */
+export async function clearHistory(): Promise<number> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/history`, {
+    method: "DELETE",
+    headers: adminAuthHeaders(),
+    timeoutMs: 30000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Could not clear conversations"));
+  return Number((await res.json()).deleted ?? 0);
+}
+
+/** Admin: delete every saved form submission. Returns how many were removed. */
+export async function clearFormSubmissions(): Promise<number> {
+  const { adminAuthHeaders } = await import("../auth/adminSession");
+  const res = await fetchWithTimeout(`${API_BASE}/api/forms/submissions`, {
+    method: "DELETE",
+    headers: adminAuthHeaders(),
+    timeoutMs: 30000,
+  });
+  if (!res.ok) throw new Error(await parseApiError(res, "Could not clear form submissions"));
+  return Number((await res.json()).deleted ?? 0);
 }
 
 export function base64ToAudioUrl(audioB64: string): string {
@@ -435,40 +456,6 @@ export async function fetchFormPromptAudio(formId: string): Promise<Record<strin
   return audio;
 }
 
-export interface FormSummaryLine {
-  field_id: string;
-  label_kn: string;
-  display_kn: string;
-  speak_kn: string;
-}
-
-export interface FormSummaryResult {
-  form_id: string;
-  title_kn: string;
-  summary_kn: string;
-  confirm_prompt_kn: string;
-  lines: FormSummaryLine[];
-}
-
-export async function fetchFormSummary(
-  formId: string,
-  values: Record<string, string>,
-): Promise<FormSummaryResult> {
-  const res = await fetchWithTimeout(
-    `${API_BASE}/api/forms/${encodeURIComponent(formId)}/summary`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ values }),
-      timeoutMs: 30_000,
-    },
-  );
-  if (!res.ok) {
-    throw new Error(await parseApiError(res, "Form summary failed"));
-  }
-  return res.json();
-}
-
 const speakInFlight = new Map<string, Promise<string>>();
 
 function speakCacheKey(text: string, speaker?: string): string {
@@ -568,6 +555,8 @@ export interface FormFillResult {
   kannada_text: string;
   english_text: string;
   value: string;
+  /** Names / addresses: what was heard, in Kannada — used to read the answer back. */
+  spoken_kn?: string;
   error?: string | null;
   validation_error?: string | null;
 }
@@ -611,6 +600,7 @@ export async function fillFormFieldAudio(
         kannada_text: (data.kannada_text ?? "").trim(),
         english_text: (data.english_text ?? "").trim(),
         value: (data.value ?? "").trim(),
+        spoken_kn: (data.spoken_kn ?? "").trim(),
         error: data.error ?? null,
         validation_error: data.validation_error ?? null,
       };
@@ -958,6 +948,8 @@ export interface CloudSettings {
   key_set: boolean;
   key_hint: string;
   key_source: "settings" | "env" | "none";
+  /** Open-source voice server answering — Speaking can only be switched to it then. */
+  open_source_voice_online?: boolean;
 }
 
 export interface CloudSettingsUpdate {

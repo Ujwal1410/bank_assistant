@@ -54,6 +54,13 @@ export function SpeechEngines({ apiOnline }: { apiOnline: boolean | null }) {
   useEffect(() => {
     if (apiOnline === false) return;
     void load();
+    // Re-check so "Open-source" Speaking unlocks once the voice server comes up.
+    const id = window.setInterval(() => {
+      fetchCloudSettings()
+        .then(setCfg)
+        .catch(() => undefined);
+    }, 20000);
+    return () => window.clearInterval(id);
   }, [apiOnline]);
 
   const flash = (text: string) => {
@@ -133,6 +140,7 @@ export function SpeechEngines({ apiOnline }: { apiOnline: boolean | null }) {
     );
   }
 
+  const voiceOnline = cfg.open_source_voice_online !== false;
   const anySarvam = STAGES.some((s) => cfg.stages[s.id].provider === "sarvam");
   const keyProblem = STAGES.map((s) => cfg.stages[s.id]).find(
     (s) => s.provider === "sarvam" && (s.error_kind === "quota" || s.error_kind === "auth"),
@@ -173,7 +181,12 @@ export function SpeechEngines({ apiOnline }: { apiOnline: boolean | null }) {
                     role="radio"
                     aria-checked={s.provider === p}
                     className={s.provider === p ? "is-on" : ""}
-                    disabled={busy !== null}
+                    disabled={busy !== null || (stage.id === "tts" && p === "local" && !voiceOnline && s.provider !== p)}
+                    title={
+                      stage.id === "tts" && p === "local" && !voiceOnline
+                        ? "Voice server is offline — start it to use the open-source voice"
+                        : undefined
+                    }
                     onClick={() =>
                       s.provider !== p &&
                       void save(
@@ -189,7 +202,17 @@ export function SpeechEngines({ apiOnline }: { apiOnline: boolean | null }) {
               </div>
               <div className="ac-engine-status">
                 {stageBadge(s, cfg.key_set)}
-                {s.provider === "local" && <span className="ac-muted">{stage.local}</span>}
+                {stage.id === "tts" && !voiceOnline ? (
+                  <Badge tone={cfg.key_set ? "amber" : "red"}>
+                    {s.provider === "local"
+                      ? cfg.key_set
+                        ? `Voice server offline · using ${cfg.provider_name}`
+                        : "Voice server offline · no voice"
+                      : "Voice server offline"}
+                  </Badge>
+                ) : (
+                  s.provider === "local" && <span className="ac-muted">{stage.local}</span>
+                )}
               </div>
               {s.provider === "sarvam" && s.ok === false && s.error && <p className="ac-engine-error">{s.error}</p>}
             </li>

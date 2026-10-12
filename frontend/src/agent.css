@@ -125,11 +125,6 @@
   }
 }
 
-.lobby-v2 .lobby-presence {
-  border-radius: 20px;
-  animation: lobby-panel-in 0.5s ease-out 0.15s both;
-}
-
 /* Safe areas for notched phones */
 .lobby-shell.lobby-fit.lobby-v2 {
   padding-top: max(0.75rem, env(safe-area-inset-top));
@@ -146,33 +141,14 @@
     padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
   }
 
-  .lobby-body-idle,
-  .lobby-body-greeting {
-    grid-template-rows: minmax(0, 1fr) auto;
+  .lobby-body-idle {
+    grid-template-rows: minmax(0, 1fr);
     gap: 0.55rem;
   }
 
   .lobby-bot-hero.agent-mascot,
   .agent-mascot.lobby-bot-hero {
     width: min(52vw, 190px);
-  }
-
-  .lobby-presence {
-    grid-template-columns: 1fr;
-    text-align: center;
-    justify-items: center;
-    padding: 0.85rem;
-  }
-
-  .lobby-camera-presence {
-    width: min(100%, 220px);
-    height: 150px;
-    margin: 0 auto;
-  }
-
-  .lobby-presence-meta {
-    justify-items: center;
-    text-align: center;
   }
 
   .lobby-invite {
@@ -241,11 +217,6 @@
     font-size: 0.82rem;
   }
 
-  .lobby-alert-btn {
-    min-height: 40px;
-    width: 100%;
-  }
-
   .lobby-stage {
     padding: 0.1rem 0.15rem;
     gap: 0.4rem;
@@ -276,54 +247,11 @@
     font-size: 0.9rem;
   }
 
-  .lobby-invite-en {
-    font-size: 0.78rem;
-  }
-
-  .lobby-invite-wait {
-    font-size: 0.82rem;
-    margin-top: 0.45rem;
-  }
-
   .lobby-v2 .lobby-cta {
     width: 100%;
     max-width: 18rem;
     min-width: 0;
   }
-
-  .lobby-presence {
-    padding: 0.7rem;
-    gap: 0.55rem;
-  }
-
-  .lobby-camera-presence {
-    width: min(100%, 100%);
-    max-width: 280px;
-    height: auto;
-    aspect-ratio: 16 / 10;
-    min-height: 120px;
-  }
-
-  .lobby-presence-title {
-    font-size: 0.9rem;
-  }
-
-  .lobby-presence-hint {
-    font-size: 0.78rem;
-  }
-
-  
-
-  .lobby-camera-badge {
-    font-size: 0.58rem;
-    padding: 0.15rem 0.35rem;
-    left: 0.3rem;
-    bottom: 0.3rem;
-  }
-
-  
-
-  
 
   .lobby-waiting-stage {
     padding: 0 0.35rem;
@@ -338,22 +266,6 @@
   .lobby-waiting-card h1 {
     font-size: clamp(1.35rem, 6vw, 1.65rem);
   }
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
-
-  
 
   .balance-result-card {
     padding: 0.85rem;
@@ -370,27 +282,6 @@
     height: 1.9rem;
     font-size: 0.9rem;
   }
-
-  .live-filled-chips {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    gap: 0.35rem;
-  }
-
-  .live-chip {
-    font-size: 0.72rem;
-  }
-
-  .bank-form-sheet {
-    padding: 0.85rem;
-  }
-
-  .form-preview-actions .primary-btn {
-    width: 100%;
-    min-height: 44px;
-  }
-
-  
 }
 
 /* Very small phones */
@@ -409,8 +300,6 @@
   .agent-mascot.lobby-bot-hero {
     width: min(38vw, 112px);
   }
-
-  
 }
 
 /* Short / landscape phones — keep controls usable */
@@ -420,9 +309,8 @@
     padding: 0.35rem 0.65rem;
   }
 
-  .lobby-body-idle,
-  .lobby-body-greeting {
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 0.9fr);
+  .lobby-body-idle {
+    grid-template-columns: minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr);
     align-items: stretch;
   }
@@ -436,17 +324,6 @@
   .agent-mascot.lobby-bot-hero {
     width: min(22vw, 110px);
   }
-
-  .lobby-presence {
-    align-content: center;
-  }
-
-  .lobby-camera-presence {
-    max-width: 180px;
-    min-height: 90px;
-  }
-
-  
 
   .lobby-invite .speak-guide {
     max-height: 28vh;

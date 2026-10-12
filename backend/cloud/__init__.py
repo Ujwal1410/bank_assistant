@@ -258,6 +258,15 @@ def unavailable_error(stage: str) -> CloudError:
     return CloudError("quota", f"Sarvam {stage} is unavailable: {reason}")
 
 
+def open_source_voice_online() -> bool:
+    """Can the open-source voice speak right now? (Remote voice server answering, or none configured.)"""
+    from backend.tts.remote_bridge import remote_tts_configured, remote_tts_healthy
+
+    if not remote_tts_configured():
+        return True  # the voice runs on this PC
+    return remote_tts_healthy(timeout_s=4.0)
+
+
 # ---------------------------------------------------------------------------
 # Admin view (never exposes the key itself)
 # ---------------------------------------------------------------------------
@@ -288,4 +297,6 @@ def public_config() -> dict[str, Any]:
         "key_set": bool(key),
         "key_hint": f"…{key[-4:]}" if len(key) >= 8 else ("set" if key else ""),
         "key_source": _key_source(),
+        # Speaking can be switched to the open-source voice only while its server is up.
+        "open_source_voice_online": open_source_voice_online(),
     }

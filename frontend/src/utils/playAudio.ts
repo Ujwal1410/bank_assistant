@@ -53,7 +53,7 @@ export function playBase64Wav(audioB64: string, signal?: AbortSignal): Promise<v
 
 /**
  * Unlock browser audio (Chrome blocks speech/Audio until AudioContext runs).
- * Call after camera permission or a tap — required for auto-greet voice.
+ * Call after a tap — required for the greeting voice.
  */
 export async function unlockAudio(): Promise<boolean> {
   if (typeof window === "undefined") return false;

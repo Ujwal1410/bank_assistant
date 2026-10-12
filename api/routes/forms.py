@@ -108,6 +108,12 @@ def list_submissions(
     return {"items": items, "count": len(items)}
 
 
+@router.delete("/forms/submissions")
+def clear_submissions(_admin: dict = Depends(admin_auth.require_admin)) -> dict:
+    """Delete all saved form submissions (admin "Clear all")."""
+    return {"ok": True, "deleted": store.clear_form_submissions()}
+
+
 @router.post("/forms/submit")
 def submit_form(body: FormSubmitBody) -> dict:
     """Persist completed form (MongoDB when configured)."""
@@ -407,6 +413,7 @@ async def fill_field(
         "kannada_text": kannada,
         "english_text": english,
         "value": value or english or kannada,
+        "spoken_kn": (result.get("spoken_kn") or "").strip(),
         "error": err,
         "validation_error": validation_error,
         "stage_times": stage_times,

@@ -144,9 +144,13 @@ def _request(method: str, path: str, body: dict[str, Any] | None = None) -> dict
             raise RuntimeError(f"Remote TTS unreachable at {url}: {exc.reason}") from exc
 
 
-_health_cache: dict[str, Any] = {"at": 0.0, "payload": None}
+_health_cache: dict[str, Any] = {"at": 0.0, "payload": None, "failed_at": 0.0}
 _HEALTH_CACHE_TTL_S = 15.0
 _REMOTE_HEALTH_TIMEOUT_S = 8.0
+# A down server is re-checked at most this often (every phrase would otherwise wait).
+_HEALTH_FAIL_TTL_S = 10.0
+# Past this age a "healthy" answer is not trusted when the server stops answering.
+_HEALTH_STALE_MAX_S = 60.0
 
 
 def _fetch_remote_health(timeout_s: float | None = None) -> dict[str, Any] | None:
@@ -157,6 +161,8 @@ def _fetch_remote_health(timeout_s: float | None = None) -> dict[str, Any] | Non
     cached = _health_cache.get("payload")
     if cached is not None and now - float(_health_cache["at"]) < _HEALTH_CACHE_TTL_S:
         return cached
+    if cached is None and now - float(_health_cache.get("failed_at") or 0.0) < _HEALTH_FAIL_TTL_S:
+        return None
     try:
         url = f"{remote_tts_url()}/api/health"
         req = urllib.request.Request(url, headers=_http_headers())
@@ -167,8 +173,10 @@ def _fetch_remote_health(timeout_s: float | None = None) -> dict[str, Any] | Non
         return payload
     except Exception:
         # Return stale cache on transient Cloudflare slowness instead of false "unhealthy".
-        if cached is not None:
+        if cached is not None and now - float(_health_cache["at"]) < _HEALTH_STALE_MAX_S:
             return cached
+        _health_cache["payload"] = None
+        _health_cache["failed_at"] = now
         return None
 
 
